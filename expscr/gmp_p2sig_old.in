@@ -1,0 +1,155 @@
+#!/bin/sh 
+set -ax
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+RUNNAME=
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+INITIAL_DATE=2007010112
+SDATE=2007010112
+EDATE=2007010112
+INCSTRT=06      # =24 for ecmwf
+ENDHOUR=`expr 24 \* 10`
+INCHOUR=$ENDHOUR
+INTSFCX=24
+INTOMLX=24
+INTSIG=12
+INTSFC=12
+INTFLX=12
+#
+SFC_WARM=yes   # use the  guess fields for sfc data
+SFC_WARM_CYCLE=24 # hour 
+#
+INPUT_PRESSURE=yes
+ifecmwf=2    # =2 for ECHAM data, =1 for ecmwf data, = 0 for ncep grib data
+ifmtngrb=0   #  mtn data will be replaced by the grib file
+#
+# level of moisture variable
+kdimq=9    # for level; 0 = all data level
+#    
+if [ $ifmtngrb = 1 ];then
+   fnmtngrb=@INPUT_DIR@/ecmwf/orgd/Z_\$YYMMDDHH
+fi
+#
+if [ $INPUT_PRESSURE = yes ];then
+   INITIAL_PRESSURE=@INPUT_DIR@/ecmwf/orgd/OD_OPER_AN_PL_\$YYYYMMDD
+   if [ $ifecmwf = 1 ];then
+   ifmoisrh=1  ### = 0 for sphm
+   ifheight=0  ### = 0 for ECMWF data (m**2/s**2 : geopotential ), = 1 for height (m)  
+   stdprs="1000.,925.,850.,700.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10.,7.,5.,3.,2.,1.,"
+   iupd5=131
+   ivpd5=132
+   itpd5=130
+   iqpd5=157
+   izpd5=129
+   ifcubic=1   ### =0 for linear interpolation; =1 for cubic interpolation
+   elif [ $ifecmwf = 2 ];then
+   ifmoisrh=0  ### = 0 for sphm
+   ifheight=1  ### = 1 (geopotential height: m) for ECHAM data 
+   stdprs="1000.,925.,850.,775.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,10."
+   iupd5=131
+   ivpd5=132
+   itpd5=130
+   iqpd5=133
+   izpd5=156
+   ifcubic=0   ### =0 for linear interpolation; =1 for cubic interpolation
+   else
+   ifmoisrh=1  ### = 0 for sphm
+   ifheight=1  ### = 0 for ECMWF data (m**2/s**2 : geopotential ), = 1 for height (m)  
+   stdprs="1000.,850.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10.,"
+   iupd5=33
+   ivpd5=34
+   itpd5=11
+   iqpd5=52    ### =51 for sphm
+   izpd5=7
+   fi
+   mkdir -p @PWD@/sig_sfc
+   INITIAL_SIGMA=@PWD@/sig_sfc/sig.anl.\$YYYYMMDDHH
+else
+   INITIAL_SIGMA=@INPUT_DIR@/r2/sig_sfc/sig.anl.\$YYYYMMDDHH.ieee
+fi
+INITIAL_SFC=@INPUT_DIR@/r2/sig_sfc/sfc.anl.\$YYYYMMDDHH.ieee
+INITIAL_SFC_FILE_TYPE=osu1
+#
+#  ------------- below for expert user only --------------------
+#
+# PUT THE INPUT FILES IN NFS DIRECTORY for MPI
+#
+INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
+#
+#
+. @RUNSCR_DIR@/envset
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+YYYYMMDDHH=$SDATE
+while [ $YYYYMMDDHH -le $EDATE ]
+do
+   if [ -z $RUNNAME ]; then
+	   EXECDIR=@PWD@
+   else 
+	   EXECDIR=@PWD@/$RUNNAME
+   fi
+   export EXECDIR
+   mkdir -p $EXECDIR 2>/dev/null
+   #
+   #  cd to run directory
+   #
+   cd $EXECDIR || exit 8
+   #
+	# Conversion from ascii to native format
+	#
+   if [ $INPUT_PRESSURE = yes ];then
+      sigma=dummy
+      init_sig=dummy
+   else
+      sigma=`eval echo $INITIAL_SIGMA`
+      init_sig=cnvrt_initial_sig
+   fi
+   #
+   YYYY=`echo $YYYYMMDDHH | cut -c1-4`
+   MM=`echo $YYYYMMDDHH | cut -c5-6`
+   DD=`echo $YYYYMMDDHH | cut -c7-8`
+   HH=`echo $YYYYMMDDHH | cut -c9-10`
+   YYMMDDHH=`echo $YYYYMMDDHH | cut -c3-10`
+   #
+   if [ $INITIAL_DATE -eq $YYYYMMDDHH ]; then
+      sfcf=`eval echo $INITIAL_SFC`
+      fmt=`echo $sfcf | sed 's/.*\.//g'`
+      @ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+	      @IJCAP@:@ILONF@:@ILATG@:@ILEVS@  -1:-1:-1:-1:-1 $fmt:bin \
+	      $sigma:$sfcf $init_sig:cnvrt_initial_sfc || exit 8
+      #
+      # Change input resolution to model resolution
+      #
+      @RUNSCR_DIR@/chgr $init_sig cnvrt_initial_sfc \
+	      sigit sfci $INITIAL_SFC_FILE_TYPE || exit 8
+   fi
+	#
+	# Conversion from pressure-grib to sigma format
+	#
+   if [ $INPUT_PRESSURE = yes ];then
+      YYYYMMDD=`echo $YYYYMMDDHH | cut -c1-8`
+      prsgrb=`eval echo $INITIAL_PRESSURE`
+      fnmtngrb='q'
+      sigma_pressure=`eval echo $INITIAL_SIGMA`
+      @RUNSCR_DIR@/p2sig $prsgrb $sigma_pressure \
+                           ${YYYYMMDDHH}00 $ifmoisrh $ifheight \
+                           $iupd5:$ivpd5:$itpd5:$iqpd5:$izpd5:$ifmtngrb:$kdimq:$ifcubic $stdprs \
+                           sfci $fnmtngrb || exit 8
+      @ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+	      @IJCAP@:@ILONF@:@ILATG@:@ILEVS@  -1:-1:-1:-1:-1 bin:ieee \
+	      $sigma_pressure:dummy sig.anl.$YYYYMMDDHH.ieee:cnvrt_initial_sfc || exit 8
+   fi
+	#
+   ln -fs $sigma_pressure sig.ft00
+	@RUNSCR_DIR@/fgb 0 0 $INTFLX || exit 8
+   YYYYMMDDHH=`@ETC_DIR@/maketim $YYYYMMDDHH $INCSTRT`
+done

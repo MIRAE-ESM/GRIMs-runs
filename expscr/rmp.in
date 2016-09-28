@@ -1,0 +1,436 @@
+#!/bin/sh
+set -ax
+#
+#  rsm integration from ready made initial condition
+#
+# ---------------  User changeable parameters -----------------
+#
+# run directory name
+#
+RUNNAME=r_000
+#
+# g2r with the GRIMs-GMP output
+#
+GMP2RP=no
+GMP_DIR=@OUTPUT_DIR@/g_000
+#
+# You may modify EXECDIR to /tmp directory and keep this
+# scripts on your permanent disk.
+#
+EXECDIR=@OUTPUT_DIR@/$RUNNAME; export EXECDIR
+mkdir -p $EXECDIR 2>/dev/null
+#
+# Input directories
+#
+if [ $GMP2RP = no ]; then
+	RA2_DIR=@CON_DIR@
+else
+	RA2_DIR=${GMP_DIR}
+fi
+SST_DIR=@CON_DIR@
+#RA2_DIR=/scratch/tuser_common/r2
+#SST_DIR=/scratch/tuser_common/sst
+#
+# Host name
+#
+host=`hostname | cut -d . -f1`
+if [ $host = global ];then
+	host_head=''
+else
+	host_head='/global'
+fi
+#
+# C2R (coarse regional to fine regional grid downscaling) control parameter
+#
+C2RD=`grep 'C2R' @SRCS_DIR@/define.h | awk '{print $1}' | sed 's/\#//g'`
+G2RD=`grep 'G2R' @SRCS_DIR@/define.h | awk '{print $1}' | sed 's/\#//g'`
+if [ $C2RD = define -a $G2RD = undef ]; then
+	export C2RP; C2RP=yes
+else
+	export C2RP; C2RP=no
+fi
+#
+# Specify the directory where the base initial and boudary data are located
+#
+if [ $C2RP = no ]; then
+	if [ @SYSTEM@ = dec ]; then
+		export BASE_INIT_DIR; BASE_INIT_DIR=$host_head/disk2/REAN/r2/6hour/sig_sfc
+	else
+   		export BASE_INIT_DIR; BASE_INIT_DIR=$RA2_DIR
+	fi
+	BOUND_DATA_DIR=$BASE_INIT_DIR
+fi
+#
+# Specify the directory where the coarse grid output are located
+#
+if [ $C2RP = yes ]; then
+	CR_DATA_DIR=coarser_resolution_rsm_history_file_dir
+    export CR_DATA_DIR
+fi
+#
+#  rfcst control statement
+#
+YYYYS=2001                # starting year
+MMS=07                    # starting month
+DDS=14                    # starting day
+HHS=00                    # starting hour
+YYYYE=2001                # ending year
+MME=07                    # ending month
+DDE=16                    # ending day
+HHE=00                    # ending hour
+ENDHOUR=`@ETC_DIR@/maketim $YYYYS$MMS$DDS$HHS -d $YYYYE$MME$DDE$HHE` || exit 8
+#
+DELTAT_REG=@DELTAT@       # Time step
+NESTING_HOUR=6            # Nesting hour
+INCHOUR=24                # Forecast hour per one execution
+SWHR_GBL=1                # Time interval of shortwave radiation flux
+LWHR_GBL=3                # Time interval of longwave  radiation flux
+SWHR_REG=1
+LWHR_REG=1
+SFC_CYCLE=yes             # Option for surface cycle
+SFC_CYCLE_HOUR=24         # Time interval to run surface merging
+INTSFCX=$SFC_CYCLE_HOUR   # Time interval to run surface merging
+sfc_freq=$SFC_CYCLE_HOUR  # Time interval to run surface merging
+INTOMLX=24                # Time interval to run ocean mixed layer model
+LOCDF_REG=0
+INTRESTART=24             # Time interval to restart the model
+INTSIG=6                  # Time interval to create sigma output file
+INTPOST=$INTSIG           # Time interval to create post grib output file
+FCST_RESTART=yes          # Option indicating whether current forecast is first
+#
+#  rsm domain specification - 
+#  it takes the map data in src/rmap but can change rsm script  mannually
+# 
+RPROJ=@PROJ@
+RTRUTH=@TRUTH@
+RCOTRU=@COTRU@
+RORIENT=@ORIENT@
+RDELX=@DELX@
+RDELY=@DELY@
+RCENLAT=@CENLAT@
+RCENLON=@CENLON@
+RLFTGRD=@LFTGRD@
+RBTMGRD=@BTMGRD@
+#
+#   coarse rsm domain specification - 
+#   user should mannually map data for coarse grid
+#
+if [ $C2RP = yes ]; then
+	CPROJ=1.
+	CTRUTH=60.
+	CCOTRU=60.
+	CORIENT=-100.
+	CDELX=60000.
+	CDELY=60000.
+	CCENLAT=90.
+	CCENLON=0.
+	CLFTGRD=64.
+	CBTMGRD=136.
+else
+	CPROJ=0.0
+	CTRUTH=0.0
+	CCOTRU=0.0
+	CORIENT=0.0
+	CDELX=0.0
+	CDELY=0.0
+	CCENLAT=0.0
+	CCENLON=0.0
+	CLFTGRD=0.0
+	CBTMGRD=0.0
+fi
+#
+# ------------- chenge below for expert only ----------------------
+#
+DELETE_SIGGLOB=yes
+#
+if [ $INCHOUR -lt $INTSFCX ] ; then
+	echo "INCHOUR < INTSFCX"
+	echo "INCHOUR set to INTSFCX to make sure sfc is called."
+fi
+#
+if [ @SYSTEM@ = dec ]; then
+	SST_ANL_T0=$host_head/disk1/SSTD/amipsst/gisst22.\$YYYY.daily
+else
+	SST_ANL_T0=$SST_DIR/gisst22.\$YYYY.daily
+fi
+ICE_ANL_T0=@CON_DIR@/clim.ice.r2.1979-1998.grib
+SNO_ANL_T0=@CON_DIR@/clim.snow.r2.1979-1998.grib
+SCV_ANL_T0=
+iicegrb0=1                      # 0 : use guess, 1 : use grib file
+isnogrb0=0
+isstgrb0=1
+ism2grb0=0                      # soil moisture grib or guess for initial time
+export iicegrb0 isnogrb0 isstgrb0 ism2grb0
+#
+SST_ANL=$SST_ANL_T0
+ICE_ANL=$ICE_ANL_T0
+SNO_ANL=$SNO_ANL_T0
+SCV_ANL=$SCV_ANL_T0
+iicegrb=$iicegrb0
+isnogrb=$isnogrb0
+isstgrb=$isstgrb0
+ism2grb=$ism2grb0
+export iicegrb isnogrb isstgrb ism2grb
+#
+# -------  do not change below  -------------------------------------
+#
+# ready-made initial condition and base field
+#
+FCST_NPES=@NPES@
+#
+#   Environmental variables
+#
+. @RUNSCR_DIR@/envset 
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+cp @RUNSCR_DIR@/../namelist.$scrnam $EXECDIR/0LOG.namelist.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+#
+cd $EXECDIR
+#
+rm ERROR.out 2>/dev/null
+echo "`date` $0: started" >>ERROR.out
+#
+#  create namelist regional domain data
+#
+cat >rsm.parm <<EOF
+ &NAMLOC
+ RPROJ    = $RPROJ,
+ RTRUTH   = $RTRUTH,
+ RCOTRU   = $RCOTRU,
+ RORIENT  = $RORIENT,
+ RDELX    = $RDELX,
+ RDELY    = $RDELY,
+ RCENLAT  = $RCENLAT,
+ RCENLON  = $RCENLON,
+ RLFTGRD  = $RLFTGRD,
+ RBTMGRD  = $RBTMGRD,
+ CPROJ    = $CPROJ,
+ CTRUTH   = $CTRUTH,
+ CCOTRU   = $CCOTRU,
+ CORIENT  = $CORIENT,
+ CDELX    = $CDELX,
+ CDELY    = $CDELY,
+ CCENLAT  = $CCENLAT,
+ CCENLON  = $CCENLON,
+ CLFTGRD  = $CLFTGRD,
+ CBTMGRD  = $CBTMGRD,
+/
+EOF
+#
+if [ $GMP2RP = no ]; then
+	INITIAL_SFC_FILE_TYPE=osu1
+else
+	INITIAL_SFC_FILE_TYPE=noa1
+fi
+#
+#  automatic restart
+#
+if [ -s r_sigit -a -s r_sigitdt -a -s r_sfci -a $FCST_RESTART = yes ] ; then
+	#
+	#  restart
+	#
+	h=`@ETC_DIR@/fhour r_sigit`
+	echo fhour in the r_sigit file = $h
+else
+	#
+	#  cold start
+	#
+	# co2
+	#
+	if [ ! -s co2con ] ; then
+	      @RUNSCR_DIR@/co2 || exit 8
+	fi
+	#
+	#  Regional mountain (r_mtn)
+	#
+	if [ ! -s r_slmsk  -o ! -s r_oroggd -o ! -s r_mtnvar ] ; then
+		@RUNSCR_DIR@/r_mtn || exit 8
+	fi
+	#
+	#  Initial condition.  Convert to native format
+	#
+  	if [ $C2RP = no ]; then
+		#
+		#  Convert to native format
+		#
+		INPUT_RESOLUTION=t@JCAP@k@LEVS@
+		MODEL_RESOLUTION=t@JCAP@k@LEVS@
+		export INPUT_RESOLUTION
+		export MODEL_RESOLUTION
+		#
+		#  Edit below if not a ready-made case
+		#   base_sig_initial=sig.anl.$YYYYS$MMS$DDS$HHS.ieee
+		#   base_sfc_initial=sfc.anl.$YYYYS$MMS$DDS$HHS.ieee
+		#
+		YYMMDDHH=`echo $YYYYS|cut -c3-4`$MMS$DDS$HHS
+		if [ $GMP2RP = no ]; then
+			base_sig_initial=$BASE_INIT_DIR/sig.anl.$YYYYS$MMS$DDS$HHS.ieee
+			base_sfc_initial=$BASE_INIT_DIR/sfc.anl.$YYYYS$MMS$DDS$HHS.ieee
+		else
+			base_sig_initial=$BASE_INIT_DIR/sig.ft00
+			base_sfc_initial=$BASE_INIT_DIR/sfc.ft00
+		fi
+		#
+		#  convert input global files to binary
+		#
+		if [ $GMP2RP = no ]; then
+			@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+				@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+				$YYYYS:-1:-1:-1:-1 \
+				ieee:bin \
+				$base_sig_initial:$base_sfc_initial \
+				cnvrt_initial_sig:cnvrt_initial_sfc || exit 8
+		else
+			cp $base_sig_initial cnvrt_initial_sig
+			cp $base_sfc_initial cnvrt_initial_sfc
+		fi
+		#
+		#  convert to 4-digit year if not
+		#
+		century=`expr \( \( $YYYYS - 1 \) / 100 \) + 1`
+			@RUNSCR_DIR@/cnv4dig cnvrt_initial_sig cnvrt_initial_sfc \
+			sig.base.$YYYYS$MMS$DDS$HHS sfc.base.$YYYYS$MMS$DDS$HHS \
+			$INITIAL_SFC_FILE_TYPE $century || exit 8
+	else
+		#
+		@RUNSCR_DIR@/r_sigsfc_chgdates $h $CR_DATA_DIR || exit 8
+		#
+	fi
+	#
+	#  Initial data for rsm
+	#
+	ln -fs sig.base.$YYYYS$MMS$DDS$HHS sig.ft00
+	ln -fs sfc.base.$YYYYS$MMS$DDS$HHS sfc.ft00
+	#
+	#  horizontal transform/interpolation
+	#
+	@RUNSCR_DIR@/r_inpg $INITIAL_SFC_FILE_TYPE \
+		sig.ft00:sfc.ft00 \
+		r_sig.ft00:r_sfc.ft00 || exit 8
+	rm sig.ft00 sfc.ft00
+	mv sig.base.$YYYYS$MMS$DDS$HHS base_sigit
+	#
+	#  renew r_sfc files using grib data input
+	#
+	YYYY=$YYYYS
+	SST_GRB_T0=`eval echo $SST_ANL_T0`
+	SNO_GRB_T0=`eval echo $SNO_ANL_T0`
+	ICE_GRB_T0=`eval echo $ICE_ANL_T0`
+	export SST_GRB_T0 SNO_GRB_T0 ICE_GRB_T0
+	@RUNSCR_DIR@/sfc0 rmp r_sfc.ft00 r_sfci $INITIAL_SFC_FILE_TYPE || exit 8
+	cp r_sfci r_sfc.ft00
+	cp r_sig.ft00 r_sigit
+	cp r_sigit r_sigitdt
+	#
+	h=0
+fi
+#
+#  forecast loop
+#
+while [ $h -lt $ENDHOUR ];do
+	h=`expr $h + 0`
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -lt 10 ]; then hx=0$hx; fi
+	#
+	#  link base field to properly named file	
+	#
+	fhend=`expr $INCHOUR + $NESTING_HOUR`
+	modf=`expr $fhend \/ $NESTING_HOUR`
+	if [ `expr $modf \* $NESTING_HOUR` -ne $fhend ] ; then
+		fhend=`expr \( $modf + 1 \) \* $NESTING_HOUR`
+	fi
+	fh=0
+	while [ $fh -le $fhend ] ; do
+		FH=`expr $fh + $h`
+		FH=`expr \( $FH \/ $NESTING_HOUR \) \* $NESTING_HOUR`
+		if [ $FH -gt $ENDHOUR ] ; then
+			break
+		fi
+		if [ $FH -lt 10 ]; then FH=0$FH; fi
+		if [ ! -s base_sig.ft$FH ] ; then
+			FYYYYMMDDHH=`@ETC_DIR@/maketim $YYYYS$MMS$DDS$HHS -h $FH`
+			YYYYF=`eval echo $FYYYYMMDDHH | cut -c1-4`
+			MMF=`eval echo $FYYYYMMDDHH | cut -c5-6`
+			DDF=`eval echo $FYYYYMMDDHH | cut -c7-8`
+			HHF=`eval echo $FYYYYMMDDHH | cut -c9-10`
+			if [ $GMP2RP = no ]; then
+				BASE_SIG=$BOUND_DATA_DIR/sig.anl.\${FYYYYMMDDHH}.ieee
+				fname=`eval echo $BASE_SIG`
+				@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+					@IJCAP@:@ILONF@:@ILATG@:@ILEVS@  \
+					$YYYYF:$MMF:$DDF:$HHF:-1 \
+					ieee:bin \
+					$fname:dummy \
+					base_sig.ft$FH:dummy1 || exit 8
+			else
+				basehour=`@ETC_DIR@/maketim ${FYYYYMMDDHH} -d $YYYYS$MMS$DDS$HHS`
+				if [ $basehour -lt 10 ]; then basehour=0$basehour; fi
+				BASE_SIG=$BOUND_DATA_DIR/sig.ft${basehour}
+				fname=`eval echo $BASE_SIG`
+				cp $fname base_sig.ft$FH
+			fi
+			@RUNSCR_DIR@/basefnam base_sig.ft$FH
+		fi
+		fh=`expr $fh + $NESTING_HOUR`
+	done
+	#
+	#  generate forecast namelist data
+	#
+	YYYY=`@ETC_DIR@/maketim $YYYYS$MMS$DDS$HHS -h $h | cut -c 1-4`
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB ICE_GRB
+	@RUNSCR_DIR@/r_fcstparm $INCHOUR $ENDHOUR $DELTAT_REG \
+		$NESTING_HOUR $INTPOST $INTSFCX $INTOMLX $LOCDF_REG $INTRESTART || exit 8
+	#
+	#  Execute forecast
+	#
+	export MP_SET_NUMTHREADS
+	inchour=$INCHOUR
+	prthour=$INTPOST
+	export h hx inchour prthour
+	if [ "$BATCHQUE" = qsub ]; then
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		log_name="r_fcst.e`echo $fcstid | cut -d'.' -f1`"
+	elif [ "$BATCHQUE" = llsubmit ]; then
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		log_name="r_fcst.e`echo $fcstid | cut -d'.' -f2`"
+	elif [ "$BATCHQUE" = bsub ]; then
+		fcstid0=`$BATCHQUE < @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
+		log_name="fcst.e`echo $fcstid`"
+	fi
+	if [ "$BATCHQUE" != "" ]; then
+		@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+	fi
+	#
+	#  copy files for next forecast segment
+	#
+	cp r_sigit.ft$hx  r_sigit   || exit 8
+	mv r_sigit.ft$hx  r_sig.ft$hx   || exit 8
+	mv r_sigitdt.ft$hx r_sigitdt || exit 8
+	cp r_sfc.ft$hx  r_sfci    || exit 8
+	#
+	#  post processing
+	#
+	if [ @DOPOST@ = yes ] ; then
+		@RUNSCR_DIR@/r_pgb $h $hx $INTPOST || exit 8
+	elif [ @CATPGB@ = yes ] ; then
+		@ETC_DIR@/catpgb
+	fi
+	/bin/rm -f r_sigit.ft$hx r_sigitdt.ft$hx base.ft$hx
+	#
+	h=$hx
+done
+#
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+	lamclean
+	lamhalt
+fi
+#
+/bin/rm -f r_sigit r_sigitdt r_sfci
+exit 0

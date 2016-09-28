@@ -1,0 +1,15 @@
+$rdomain 
+igrd =  160
+jgrd =  9
+proj =  0.
+truth =  0.0
+cotru =  0.0
+orient =  1.0
+delx =  125.
+dely =  125.
+cenlat =  0.
+cenlon =  180.
+xleftgrd =  80.0
+botmgrd =  4.5
+MODEL_LAYER = 90
+$end  

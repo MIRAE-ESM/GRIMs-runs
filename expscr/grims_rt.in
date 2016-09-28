@@ -1,0 +1,288 @@
+#!/bin/sh 
+#PBS -V
+#PBS -l select=1:ncpus=1
+#PBS -j oe
+##PBS -q @SER_QUE@
+##PBS -N grims_rt.fcstps
+##PBS -o @INF_DIR@/grims_rt.fcstps.log
+##PBS -l place=scatter:excl
+set -a
+#
+# grims_rt.info
+#
+#. @INF_DIR@/grims_rt.info
+#
+# this script makes 72 hour integration starting from an example initial
+# condition. ideal for first testing the system on new computer system
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+SDATE=${date}           # Starting forecast date
+ENDHOUR=${fcst_hr}      # Length of model integration in hour
+INTPOST=$ENDHOUR        # Time interval to create output files for the first execution
+INCHOUR=$INTPOST        # Forecast hour for the first execution
+INTSFCX=10000000        # Time interval to run surface merging
+INTOMLX=24              # Time interval to run ocean mixed layer model
+INTSIG=${int_sig}       # Time interval to create sigma output file
+INTSFC=$INTSIG          # Time interval to create surface output file
+INTFLX=$INTSFC          # Time interval to create surface flux output file
+INTSIG2=${int_sig2}     # Time interval to create sigma output file after first execution
+INTSFC2=$INTSIG2        # Time interval to create surface output file after first execution
+INTFLX2=$INTSFC2        # Time interval to create surface flux output file after first execution
+INTRESTART=$ENDHOUR     # Time interval to restart the model
+SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
+LWHR_GBL=3              # Time interval of longwave  radiation flux
+#
+DEL_FLUX=no             # Option deleting flux file after forecst (yes;no)
+FCST_RESTART=yes        # Option indicating whether current forecast is first
+SFC_FCST=no             # Option using surface fcst data
+SFC_ASSI_HOUR=12        # Time interval of surface fcst data
+#
+# ------------- below for expert user only -------------------------------------
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+export EXECDIR=${out_dir}
+#
+# -------------  do not change below  ------------------------------------------
+#
+mkdir -p $EXECDIR 2>/dev/null
+#
+FHOUR=`expr $SFC_ASSI_HOUR \* -1`
+FDATE=`@ETC_DIR@/validate.s ${SDATE} ${FHOUR}`
+FCSTDIR=${out_dir}/../${FDATE}
+#
+INITIAL_SIGMA=${file1}
+INITIAL_SFC_ANAL=${file2}
+INITIAL_SFC_FCST=${FCSTDIR}/sfc.ft${SFC_ASSI_HOUR}
+INITIAL_SFC_FILE_TYPE=noa1
+#
+# blank means use guess (in the sfc file).
+#
+SST_ANL_T0=${file3}
+ICE_ANL_T0=${file4}
+SNO_ANL_T0=${file5}
+SCV_ANL_T0=
+#
+iicegrb0=1              # 0 : use guess, 1 : use grib file
+isnogrb0=1
+isstgrb0=1
+ism2grb0=0
+#
+SST_ANL=${SST_ANL_T0}
+ICE_ANL=${ICE_ANL_T0}
+SNO_ANL=${SNO_ANL_T0}
+SCV_ANL=
+#
+iicegrb=$iicegrb0
+isnogrb=$isnogrb0
+isstgrb=$isstgrb0
+ism2grb=$ism2grb0
+#
+INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
+#
+FCST_NPES=@NPES@
+FCST_NCPUS=@NCPUS@
+#
+# set environmental variables
+#
+. @RUNSCR_DIR@/envset
+#
+# cd to run directory
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+cd $EXECDIR || exit 8
+#
+# renew log file
+#
+cat @PWD@/$0 > ERROR.out
+echo '==============' >>ERROR.out
+#
+# Automatic restart
+#
+if [ @BARO_TEST@ != 1 ]; then
+	if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ]; then
+		#
+		# Restart
+		#
+		h=`@ETC_DIR@/fhour sigit`
+		echo "...already completed (fhour in the sigit file = $h)"
+	else
+		#
+		# co2
+		#
+		echo;echo "...processing co2";echo
+		@RUNSCR_DIR@/co2 || exit 8
+		#
+		# mountain
+		#
+		echo;echo "...processing mountain";echo
+		@RUNSCR_DIR@/mtn || exit 8
+		#
+		# Initial start.
+		#
+		h=00
+		#
+		# Conversion from GFS ieee to GRIMs binary format
+		#
+		fmt=`echo $INITIAL_SIGMA | sed 's/.*\.//g'`
+        if [ -s $INITIAL_SIGMA -a \( -s $INITIAL_SFC_ANAL -o -s $INITIAL_SFC_FCST \) ]; then
+            echo;echo "...converting GFS ieee to GRIMs binary";echo
+            if [ "$SFC_FCST" = no ]; then
+                @ETC_DIR@/scnvrt_gfs gsm noa1 \
+                        @IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+                        -1:-1:-1:-1:-1 \
+                        ieee:bin $INITIAL_SIGMA:$INITIAL_SFC_ANAL \
+                        cnvrt_initial_sig:cnvrt_initial_sfc || exit 8
+            else
+                @ETC_DIR@/scnvrt_gfs gsm noa1 \
+                        @IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+                        -1:-1:-1:-1:-1 \
+                        ieee:bin $INITIAL_SIGMA:dummy \
+                        cnvrt_initial_sig:dummy || exit 8
+            fi
+        else
+            echo;echo '...initial sigma or surface data is empty';echo ; exit 8
+        fi
+		#
+		# Find initial date and hour
+		#
+		@ETC_DIR@/date cnvrt_initial_sig >date.$$ || exit 8
+		read HH MM DD YYYY FH <date.$$ ; rm date.$$
+		#echo "...date fhour=$YYYY$MM$DD$HH $FH"
+		#
+		# Change input resolution to model resolution
+		#
+		echo;echo "...changing resolution";echo
+        if [ "$SFC_FCST" = no ]; then
+            @RUNSCR_DIR@/chgr cnvrt_initial_sig cnvrt_initial_sfc \
+                        sigit sfci $INITIAL_SFC_FILE_TYPE || exit 8
+        else
+            @RUNSCR_DIR@/chgr cnvrt_initial_sig dummy \
+                        sigit dummy $INITIAL_SFC_FILE_TYPE || exit 8
+        fi
+        #
+        # Surface field
+        #
+        if [ "$SFC_FCST" = yes ]; then
+				echo "echo;...using sfc.ft${SFC_ASSI_HOUR} at ${FDATE}...";echo
+                cp $FCSTDIR/sig.ft$SFC_ASSI_HOUR sig_guess  || exit 8
+                cp $INITIAL_SFC_FCST sfc_guess  || exit 8
+                @ETC_DIR@/date sfc_guess >date.$$ || exit 8
+                read BHH BMM BDD BYYYY BFH <date.$$ ; rm date.$$
+                sfc_guess_fcst=`@ETC_DIR@/validate.s $BYYYY$BMM$BDD$BHH $BFH`
+                if [ $SDATE != $sfc_guess_fcst ]; then
+                    echo 'Starting time and fcst time in sfc file are not same.' ; exit 8
+                fi
+                @RUNENV@ @RUNSCR_DIR@/chgdates $YYYY:$MM:$DD:$HH:0 \
+                                sig_guess:sfc_guess dummy:sfci || exit 8
+        fi
+		#
+		# Convert initial sfc file type to model sfc file type
+		#
+		echo;echo "...converting surface file type";echo
+		SST_GRB_T0=`eval echo $SST_ANL`
+		SNO_GRB_T0=`eval echo $SNO_ANL`
+		SCV_GRB_T0=`eval echo $SCV_ANL`
+		ICE_GRB_T0=`eval echo $ICE_ANL`
+		export SST_GRB_T0 SNO_GRB_T0 SCV_GRB_T0 ICE_GRB_T0
+		export iicegrb0 isstgrb0 isnogrb0 ism2grb
+		@RUNSCR_DIR@/sfc0 gsm sfci sfco $INITIAL_SFC_FILE_TYPE || exit 8
+		#
+		cp sfco  sfci     || exit 8
+		cp sigit sigitdt  || exit 8
+		cp sigit sig.ft$h || exit 8
+		cp sfci  sfc.ft$h || exit 8
+		#
+		@ETC_DIR@/date sigit >date.$$ || exit 8
+		read HH MM DD YYYY FH <date.$$ ; rm date.$$
+		#echo $YYYY $MM $DD $HH $FH
+	fi
+else
+	h=0
+fi
+#
+#  forecast hour loop
+#
+xc=0
+while [ $h -lt $ENDHOUR ] ; do
+	#
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -gt $ENDHOUR ] ; then
+		hx=$ENDHOUR
+	fi
+    if [ $hx -gt $INTPOST ] ; then
+        if [ $h -lt $INTPOST ] ; then
+            INCHOUR=`expr $INTPOST - $h`
+            hx=$INTPOST
+        else
+            INCHOUR=`expr $ENDHOUR - $h`
+            hx=$ENDHOUR
+            INTSIG=$INTSIG2
+            INTSFC=$INTSFC2
+            INTFLX=$INTFLX2
+        fi
+    fi
+	if [ $hx -lt 10 ];then hx=0$hx;fi
+	#
+	echo;echo "...setting parameters for forecast";echo
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	SCV_GRB=`eval echo $SCV_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
+	export SWHR_GBL LWHR_GBL
+	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+	#
+	# Execute forecast
+	#
+	echo ; echo "   fcst" ; echo ${bar}
+	if [ "$BATCHQUE" = qsub ]; then
+		fcstid=`$BATCHQUE -N grims_rt_fcst -o $EXECDIR/grims_rt_fcst.out @RUNSCR_DIR@/fcst @BATCHsuffix@ || exit 8`
+		log_name="grims_rt_fcst.e$fcstid"
+		echo "      queue   = `qstat | grep ${fcstid} | awk '{print $6}'`"
+		echo "      fcst id = ${fcstid}"
+	fi
+	sleep 5
+	#
+	# Post process
+	#
+	if [ @DOPOST@ = yes ]; then
+		echo ; echo "   post-process"; echo ${bar}
+		if [ $h -eq 00 ]; then
+			pshour=$h
+		else
+			pshour=`expr $h + $INTSIG`
+		fi
+		pehour=$hx
+		@RUNSCR_DIR@/grims_rt_post $pshour $pehour $INTSIG $fcstid  \
+					$log_name $BATCHQUE $BATCHstatus || exit 8
+	fi
+	#
+	# find archive files
+	#
+	echo; echo "...archiving re-start files (sigit sigitdt sfci)";echo
+ 	#cp sig.ft$hx sigit     || exit 8
+ 	#mv sigp.ft$hx sigitdt  || exit 8
+ 	cp sfc.ft$hx sfci      || exit 8
+	#
+	h=$hx
+done
+#
+wait
+#
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+	lamclean
+	lamhalt
+fi

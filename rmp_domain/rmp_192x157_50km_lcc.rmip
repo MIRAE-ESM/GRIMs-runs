@@ -1,0 +1,14 @@
+$rdomain 
+igrd =  192
+jgrd =  157
+proj =  2.
+truth =  60.0
+cotru =  30.0
+orient =  105.
+delx =  50000.
+dely =  50000.
+cenlat =  90.
+cenlon =  105.
+xleftgrd =  97.0
+botmgrd =  213.
+$end  

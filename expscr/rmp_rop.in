@@ -1,0 +1,331 @@
+#insert-HEADER
+#
+set -ax
+#
+# this script makes test coupled integration of RSM and ROMS starting from an example initial
+# condition. ideal for first testing the system on a new mpi computer system.
+#
+# Note that this is an mpi2 execution of two independent executable, but communication will
+# take place between the two executables during the integration.
+#
+# If mpi2 is not installed, this script does not work.
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+RUNNAME=RR_000
+#
+PROG1=rfcst
+PROG2=roms
+PROG1_NPES=@RSM_NPES@
+PROG2_NPES=@ROMS_NPES@
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+ENDHOUR=48  
+INCHOUR=$ENDHOUR
+INTSFCX=24
+INTSIG=24
+INTSFC=24
+INTPOST=24
+INTRESTART=24
+#
+YYYY_start=1990
+MONTH_start=03
+DAY_start=09
+HOUR_start=00
+YYYY_end=1990
+MONTH_end=03
+DAY_end=11
+HOUR_end=00
+#
+DELTAT_REG=@DELTAT_REG_WINTER@
+NESTING_HOUR=6
+SWHR_REG=1
+LWHR_REG=1
+INTSFCX_REG=24
+INTPOST_REG=24
+INTPGB_REG=$INTPOST_REG
+INCHOUR_REG=$ENDHOUR
+INTRESTART_REG=24
+LOCDF_REG=1
+#
+ROMS_DT=600
+ROMS_NRST_DAY=1
+ROMS_NHIS_DAY=1
+ROMS_NAVG_DAY=1
+#
+# rsm domain specification
+#
+#insert-domainspec
+#
+FCST_RESTART=no
+#
+INITIAL_SIGMA=@LIBS_DIR@/con/sigft0090030900.asc
+INITIAL_SFC=@LIBS_DIR@/con/sfcanl90030900.asc
+INITIAL_SFC_FILE_TYPE=osu1
+#
+#  blank means use guess (in the sfc file).
+#
+SST_ANL=@LIBS_DIR@/con/sstanl.900309.grib
+ICE_ANL=@LIBS_DIR@/con/clim.ice.grib
+SNO_ANL=
+SCV_ANL=
+#
+GLOBAL_SIG_INITIAL=$INITIAL_SIGMA
+GLOBAL_SFC_INITIAL=$INITIAL_SFC
+BASE_SIG=@LIBS_DIR@/con/sigft\${FH}90030900.asc
+#
+#   coarse rsm domain specification
+#
+CPROJ=0.0
+CTRUTH=0.0
+CORIENT=0.0
+CDELX=0.0
+CDELY=0.0
+CCENLAT=0.0
+CCENLON=0.0
+CLFTGRD=0.0
+CBTMGRD=0.0
+#
+#  ------------- below for expert user only --------------------
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+EXECDIR=@RUNS_DIR@/$RUNNAME
+#
+mkdir -p $EXECDIR 2>/dev/null
+#
+INPUT_RESOLUTION=t@JCAP@k@LEVS@
+#
+#  cd to run directory
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+ls -l @RSM_SRCS_DIR@/bin >$EXECDIR/0LOG.bindates
+ls -l @ROMS_SRCS_DIR@ >>$EXECDIR/0LOG.bindates
+cd $EXECDIR || exit 8
+#
+ROMS_NRST=`expr $ROMS_NRST_DAY \* 86400 \/ $ROMS_DT`
+ROMS_NHIS=`expr $ROMS_NHIS_DAY \* 86400 \/ $ROMS_DT`
+ROMS_NAVG=`expr $ROMS_NAVG_DAY \* 86400 \/ $ROMS_DT`
+ROMS_NTIMES=`expr $ENDHOUR \* 3600 \/ $ROMS_DT`
+echo ROMS_NTIMES=$ROMS_NTIMES
+#
+#  create namelist regional domain data
+#
+cat >rsm.parm <<EOF
+ &NAMLOC
+ RPROJ    = $RPROJ,
+ RTRUTH   = $RTRUTH,
+ RORIENT  = $RORIENT,
+ RDELX    = $RDELX,
+ RDELY    = $RDELY,
+ RCENLAT  = $RCENLAT,
+ RCENLON  = $RCENLON,
+ RLFTGRD  = $RLFTGRD,
+ RBTMGRD  = $RBTMGRD,
+ CPROJ    = $CPROJ,
+ CTRUTH   = $CTRUTH,
+ CORIENT  = $CORIENT,
+ CDELX    = $CDELX,
+ CDELY    = $CDELY,
+ CCENLAT  = $CCENLAT,
+ CCENLON  = $CCENLON,
+ CLFTGRD  = $CLFTGRD,
+ CBTMGRD  = $CBTMGRD,
+/
+EOF
+#
+#  renew log file
+#
+cat $0 > ERROR.out
+echo '==============' >>ERROR.out
+#
+# Automatic restart
+#
+if [ -s r_sigit -a -s r_sigitdt -a -s r_sfci -a "$FCST_RESTART" = yes ];then
+	#
+	#  rsm restart
+	#
+	h_rsm=`@LIBS_DIR@/etc/fhour r_sigit`
+	echo fhour in the r_sigit file = $h_rsm
+else
+	#
+	#  Initial cold start.
+	#
+	h=00
+	#
+	#  convert input global files to binary
+	#
+	@LIBS_DIR@/etc/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+		@JCAP@:@LONF@:@LATG@:@LEVS@ $YYYYS:-1:-1:-1:-1 asc:bin \
+		$GLOBAL_SIG_INITIAL:$GLOBAL_SFC_INITIAL sig.ft00:sfc.ft00 || exit 8
+	#
+	#  horizontal transform/interpolation
+	#
+	@RSM_RUNSCR_DIR@/r_inpg $INITIAL_SFC_FILE_TYPE sig.ft00:sfc.ft00 \
+			r_sigit.ft00:r_sfc.ft00 || exit 8
+	#
+	#  renew r_sfc files using grib data input
+	#
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB ICE_GRB
+	@RSM_RUNSCR_DIR@/rsfc0 r_sfc.ft00 r_sfci $INITIAL_SFC_FILE_TYPE || exit 8
+	cp r_sfci r_sfc.ft00
+	cp r_sigit.ft00 r_sigit
+	cp r_sigit r_sigitdt
+	#
+	h=0
+fi
+#
+if [ $INCHOUR -lt $INTSFCX  -o $INCHOUR_REG -lt $INTSFCX ] ; then
+	echo "INCHOUR < INTSFCX or INCHOUR_REG < INTSFCX"
+	echo "INCHOUR set to INTSFCX to make sure sfc is called."
+fi
+#
+#   rsm Environmental variables
+#
+@RSM_RUNSCR_DIR@/basefnam $BASE_SIG
+#
+#  create namelist regional domain data
+#
+cat >rsm.parm <<EOF
+ &NAMLOC
+ RPROJ    = $RPROJ,
+ RTRUTH   = $RTRUTH,
+ RORIENT  = $RORIENT,
+ RDELX    = $RDELX,
+ RDELY    = $RDELY,
+ RCENLAT  = $RCENLAT,
+ RCENLON  = $RCENLON,
+ RLFTGRD  = $RLFTGRD,
+ RBTMGRD  = $RBTMGRD,
+ CPROJ    = $CPROJ,
+ CTRUTH   = $CTRUTH,
+ CORIENT  = $CORIENT,
+ CDELX    = $CDELX,
+ CDELY    = $CDELY,
+ CCENLAT  = $CCENLAT,
+ CCENLON  = $CCENLON,
+ CLFTGRD  = $CLFTGRD,
+ CBTMGRD  = $CBTMGRD,
+/
+EOF
+#
+#  generate grid specification, initial and boundary files
+#
+#  firtsly, locate and fetch initial soda monthly average file
+#
+ln -fs @LIBS_DIR@/con/SODA-$YYYY_start$MONTH_start.nc init.in.nc
+ln -fs init.in.nc init-grd.in.nc
+ln -fs grid.nc init-grd.nc
+#
+@ROMS_RUNSCR_DIR@/roms_preprocess $YYYY_start $MONTH_start || exit 8
+cp init.nc init.$YYYY_start$MONTH_start$DAY_start$HOUR_start.ft00
+#
+if [ -s ocean_rst.nc ] ; then
+	NRREC=0
+	LDEFOUT=T
+	ln -fs ocean_his.nc   init.nc || exit 8
+else
+	NRREC=0
+	LDEFOUT=T
+	cp init.$YYYY_start$MONTH_start$DAY_start$HOUR_start.ft00 init.nc || exit 8
+fi
+#
+#  Genrate lateral boundary condition
+#
+@ROMS_RUNSCR_DIR@/roms_boundary $YYYY_start $MONTH_start $YYYY_end $MONTH_end
+#
+#
+#  forecast loop
+#
+xc=0
+while [ $h -lt $ENDHOUR ];do
+	#
+	#  rsm
+	#
+	h=`expr $h + 0`
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -lt 10 ]; then hx=0$hx; fi
+	if [ $hx -gt $ENDHOUR ] ; then
+		hx=$ENDHOUR
+	fi
+	#
+	#  link base field to properly named file	
+	#
+	fhend=`expr $INCHOUR + $NESTING_HOUR`
+	modf=`expr $fhend \/ $NESTING_HOUR`
+	if [ `expr $modf \* $NESTING_HOUR` -ne $fhend ] ; then
+		fhend=`expr \( $modf + 1 \) \* $NESTING_HOUR`
+	fi
+	fh=0
+	while [ $fh -le $fhend ] ; do
+		FH=`expr $fh + $h`
+		FH=`expr \( $FH \/ $NESTING_HOUR \) \* $NESTING_HOUR`
+		if [ $FH -gt $ENDHOUR ] ; then
+			break
+		fi
+		if [ $FH -lt 10 ]; then FH=0$FH; fi
+		if [ ! -s base_sig.ft$FH ] ; then
+			fname=`eval echo $BASE_SIG`
+			@LIBS_DIR@/etc/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+				@JCAP@:@LONF@:@LATG@:@LEVS@ \
+				$YYYYS:-1:-1:-1:-1 \
+				asc:bin \
+				$fname:dummy \
+				base_sig.ft$FH:dummy1 || exit 
+				@RUNSCR_DIR@/basefnam base_sig.ft$FH
+		fi
+		fh=`expr $fh + $NESTING_HOUR`
+	done
+	#
+	#  generate rsm forecast namelist data
+	#
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	SCV_GRB=`eval echo $SNO_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB SCV_GRB ICE_GRB
+	@RSM_RUNSCR_DIR@/r_fcstparm $INCHOUR_REG $ENDHOUR $DELTAT_REG \
+					$NESTING_HOUR $INTPOST_REG $INTPGB_REG $INTSFCX $LOCDF_REG $INTRESTART_REG || exit 8
+	#
+	@RUNSCR_DIR@/romsparm $ROMS_NTIMES $ROMS_DT $ROMS_NRST $ROMS_NHIS $ROMS_NAVG $NRREC || exit 8
+	#
+	fh=`@LIBS_DIR@/etc/fhour r_sigit`
+	#
+	#  prepare for rsm execution
+	#
+	@RSM_RUNSCR_DIR@/r_prepfcst $PROG1_NPES
+	#
+	# prepare for roms execution
+	#
+	@ROMS_RUNSCR_DIR@/preproms
+	#
+	#  Execute coupled forecast.
+	#
+	@RUNSCR_DIR@/cplfcst $PROG1 $PROG1_NPES $PROG2 $PROG2_NPES
+	#
+	#  copy rsm files for next forecast segment
+	#
+	cp r_sigit.ft$hx  r_sigit   || exit 8
+	mv r_sigitdt.ft$hx r_sigitdt || exit 8
+	cp r_sfc.ft$hx  r_sfci    || exit 8
+	#
+	h=$hx
+	#
+        #rename ocean_his and ocean_nc as G-RSM
+        @ROMS_RUNSCR_DIR@/renamenc  || exit 8
+        #
+done
+if [ @MACHINE@ = mac -a @MARCH@ = mpi ] ; then
+        lamclean
+        lamhalt
+fi

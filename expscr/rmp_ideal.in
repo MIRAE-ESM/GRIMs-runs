@@ -1,0 +1,332 @@
+#!/bin/sh
+set -ax
+#
+#  rsm integration from ready made initial condition
+#
+# ---------------  User changeable parameters -----------------
+#
+# run directory name
+#
+IDEAL_EXP=cold             # idealized experiments: warm, cold, hill
+RUNNAME=r_${IDEAL_EXP}   # run directory name
+#
+# You may modify EXECDIR to /tmp directory and keep this
+# scripts on your permanent disk.
+#
+EXECDIR=@OUTPUT_DIR@/$RUNNAME; export EXECDIR
+mkdir -p $EXECDIR 2>/dev/null
+#
+#  rfcst control statement
+#
+YYYYS=1001                # starting year
+MMS=01                    # starting month
+DDS=01                    # starting day
+HHS=00                    # starting hour
+YYYYE=1001                # ending year
+MME=01                    # ending month
+DDE=01                    # ending day
+HHE=01                    # ending hour
+ENDHOUR=`@ETC_DIR@/maketim $YYYYS$MMS$DDS$HHS -d $YYYYE$MME$DDE$HHE` || exit 8
+#
+NESTING_HOUR=$ENDHOUR     # Nesting hour
+INCHOUR=$ENDHOUR          # Forecast hour per one execution
+SWHR_GBL=1                # Time interval of shortwave radiation flux
+LWHR_GBL=3                # Time interval of longwave  radiation flux
+SWHR_REG=1
+LWHR_REG=1
+SFC_CYCLE=yes             # Option for surface cycle
+SFC_CYCLE_HOUR=24         # Time interval to run surface merging
+INTSFCX=$SFC_CYCLE_HOUR   # Time interval to run surface merging
+sfc_freq=$SFC_CYCLE_HOUR  # Time interval to run surface merging
+INTOMLX=24                # Time interval to run ocean mixed layer model
+LOCDF_REG=0
+INTRESTART=24             # Time interval to restart the model
+INTSIG=1                  # Time interval to create sigma output file
+INTPOST=$INTSIG           # Time interval (hr)  to create post grib output file
+INTPOST_SEC=30            # Time interval (sec) of output file if POST_SEC is defined
+FCST_RESTART=yes          # Option indicating whether current forecast is first
+#
+#  IDEAL experiment setup
+#
+if [ "$IDEAL_EXP" = cold ]; then
+#cold bubble (Straka et al. 1993)
+DELTAT_REG=1     # Time step
+CONLEVS=60       # Number of vertical layers with constant vertical spacing (dsig)
+DSIG=0.01        # Vertical spacing for CONLEVS levels (dsig)
+ISENZ=6000.      # Height (m) of the top of isentropic atmosphere
+THETA0=300.      # Potential temperature (K) of isentropic atmosphere
+TA=15.           # Perturbation of temperature (K)
+Z0=3000.         # Height (m) of the center of the bubble above the sfc in z direction
+XR=4000.         # Radius (m) of the bubble in x direction
+ZR=2000.         # Radius (m) of the bubble in z direction
+elif [ "$IDEAL_EXP" = hill ]; then
+#flow over bell-shape hill (Durran and Klemp 1983)
+DELTAT_REG=10    # Time step
+CONLEVS=@LEVS@   # Number of vertical layers with constant vertical spacing (dsig)
+DSIG=0.02        # Vertical spacing for CONLEVS levels (dsig)
+ISENLEVS=0       # Number of vertical layers of isentropic atmosphere
+THETA0=250.      # Potential temperature (K) of isentropic atmosphere
+U0=20.           # Initial base wind speed (m/s)
+HM=1.            # Height (m) of the mountain peak
+XA=5.            # XA*delx is the radius at the half-height
+elif [ "$IDEAL_EXP" = warm ]; then
+#warm bubble (Wicker and Skamarock 1998; Ahmad and Lindeman 2006)
+DELTAT_REG=1     # Time step
+CONLEVS=80       # Number of vertical layers with constant vertical spacing (dsig)
+ISENLEVS=80      # Number of vertical layers of isentropic atmosphere
+DSIG=0.0094      # Vertical spacing for CONLEVS levels (dsig)
+THETA0=300.      # Potential temperature (K) of isentropic atmosphere
+TA=2.            # Perturbation maximum of potential temperature (K)
+Z0=2000.         # Height (m) of the center of the bubble above the sfc in z direction
+RC=2000.         # Radius (m) of the bubble
+RE=0.            # e-folding radius (m) of which the excess potential temperature decreases
+#warm bubble (Robert 1993)
+#DELTAT_REG=1     # Time step
+#CONLEVS=160      # Number of vertical layers with constant vertical spacing (dsig)
+#DSIG=0.001       # Vertical spacing for CONLEVS levels (dsig)
+#ISENLEVS=160     # Number of vertical layers of isentropic atmosphere
+#THETA0=303.16    # Potential temperature (K) of isentropic atmosphere
+#TA=0.5           # Perturbation of potential temperature (K)
+#Z0=260.          # Height (m) of the center of the bubble above the sfc in z direction
+#RC=50.           # Radius (m) of the bubble
+#RE=100.          # e-folding radius (m) of which the excess potential temperature decreases
+fi
+#
+#  rsm domain specification - 
+#  it takes the map data in src/rmap but can change rsm script manually
+# 
+RPROJ=@PROJ@
+RTRUTH=@TRUTH@
+RCOTRU=@COTRU@
+RORIENT=@ORIENT@
+RDELX=@DELX@
+RDELY=@DELY@
+RCENLAT=@CENLAT@
+RCENLON=@CENLON@
+#RLFTGRD=@LFTGRD@
+#RBTMGRD=@BTMGRD@
+RLFTGRD=`echo "scale=2;@IGRD@/2;" | bc`
+RBTMGRD=`echo "scale=2;@JGRD@/2;" | bc`
+#
+#   coarse rsm domain specification - 
+#   user should mannually map data for coarse grid
+#
+CPROJ=0.
+CTRUTH=0.
+CCOTRU=0.
+CORIENT=1.
+DELX=`echo @DELX@ | cut -d'.' -f1`
+DELY=`echo @DELY@ | cut -d'.' -f1`
+CDELX=`expr $DELX \* 2`
+CDELY=`expr $DELY \* 2`
+CCENLAT=0.
+CCENLON=180.
+CIGRD=`expr @CIGRD1@ - 1`
+CJGRD=`expr @CJGRD1@ - 1`
+CLFTGRD=`echo "scale=2;${CIGRD}/2;" | bc`
+CBTMGRD=`echo "scale=2;${CJGRD}/2;" | bc`
+#
+# ------------- change below for expert only ----------------------
+#
+# C2R (coarse regional to fine regional grid downscaling) control parameter
+#
+C2RD=`grep 'C2R' @SRCS_DIR@/define.h | awk '{print $1}' | sed 's/\#//g'`
+G2RD=`grep 'G2R' @SRCS_DIR@/define.h | awk '{print $1}' | sed 's/\#//g'`
+if [ $C2RD = define -a $G2RD = undef ]; then
+	export C2RP; C2RP=yes
+else
+	export C2RP; C2RP=no
+    echo "SRCS should be compiled for C2R to run the ideal experiments."
+    exit 8
+fi
+#
+SST_ANL_T0=$SST_DIR/gisst22.\$YYYY.daily
+ICE_ANL_T0=@CON_DIR@/clim.ice.r2.1979-1998.grib
+SNO_ANL_T0=@CON_DIR@/clim.snow.r2.1979-1998.grib
+SCV_ANL_T0=
+iicegrb0=1                      # 0 : use guess, 1 : use grib file
+isnogrb0=0
+isstgrb0=1
+ism2grb0=0                      # soil moisture grib or guess for initial time
+export iicegrb0 isnogrb0 isstgrb0 ism2grb0
+#
+SST_ANL=$SST_ANL_T0
+ICE_ANL=$ICE_ANL_T0
+SNO_ANL=$SNO_ANL_T0
+SCV_ANL=$SCV_ANL_T0
+iicegrb=$iicegrb0
+isnogrb=$isnogrb0
+isstgrb=$isstgrb0
+ism2grb=$ism2grb0
+export iicegrb isnogrb isstgrb ism2grb
+#
+# ready-made initial condition and base field
+#
+FCST_NPES=@NPES@
+#
+#   Environmental variables
+#
+. @RUNSCR_DIR@/envset 
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+cp @RUNSCR_DIR@/../namelist.$scrnam $EXECDIR/0LOG.namelist.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+#
+cd $EXECDIR
+#
+rm ERROR.out 2>/dev/null
+echo "`date` $0: started" >>ERROR.out
+#
+#  create namelist regional domain data
+#
+cat >rsm.parm <<EOF
+ &NAMLOC
+ RPROJ    = $RPROJ,
+ RTRUTH   = $RTRUTH,
+ RCOTRU   = $RCOTRU,
+ RORIENT  = $RORIENT,
+ RDELX    = $RDELX,
+ RDELY    = $RDELY,
+ RCENLAT  = $RCENLAT,
+ RCENLON  = $RCENLON,
+ RLFTGRD  = $RLFTGRD,
+ RBTMGRD  = $RBTMGRD,
+ CPROJ    = $CPROJ,
+ CTRUTH   = $CTRUTH,
+ CCOTRU   = $CCOTRU,
+ CORIENT  = $CORIENT,
+ CDELX    = $CDELX,
+ CDELY    = $CDELY,
+ CCENLAT  = $CCENLAT,
+ CCENLON  = $CCENLON,
+ CLFTGRD  = $CLFTGRD,
+ CBTMGRD  = $CBTMGRD,
+/
+EOF
+#
+#  initial and boundary condition
+#
+if [ "$IDEAL_EXP" = warm ]; then
+	@RUNSCR_DIR@/r_inpg_ideal $YYYYS:$MMS:$DDS:$HHS ${IDEAL_EXP} \
+		${CONLEVS}:${ISENLEVS}:${DSIG} ${THETA0}:${TA} \
+		${Z0}:${RC}:${RE} r_sigit || exit 8
+elif [ "$IDEAL_EXP" = cold ]; then
+	@RUNSCR_DIR@/r_inpg_ideal $YYYYS:$MMS:$DDS:$HHS ${IDEAL_EXP} \
+		${CONLEVS}:${ISENZ}:${DSIG} ${THETA0}:${TA} \
+		${Z0}:${XR}:${ZR} r_sigit || exit 8
+elif [ "$IDEAL_EXP" = hill ]; then
+	@RUNSCR_DIR@/r_inpg_ideal $YYYYS:$MMS:$DDS:$HHS ${IDEAL_EXP} \
+		${CONLEVS}:${ISENLEVS}:${DSIG} ${THETA0}:${U0} \
+		${HM}:${XA}:dummy r_sigit || exit 8
+fi
+#
+if [ "$IDEAL_EXP" = warm -o "$IDEAL_EXP" = cold ]; then
+	cp r_sigit r_sig.fs00
+else
+	cp r_sigit r_sig.ft00
+fi
+cp r_sigit r_sigitdt
+cp base.$YYYYS$MMS$DDS$HHS base_sig.ft00
+#
+h=0
+#
+#  forecast loop
+#
+while [ $h -lt $ENDHOUR ];do
+	h=`expr $h + 0`
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -lt 10 ]; then hx=0$hx; fi
+	#
+	#  link base field to properly named file	
+	#
+	fhend=`expr $INCHOUR + $NESTING_HOUR`
+	modf=`expr $fhend \/ $NESTING_HOUR`
+	if [ `expr $modf \* $NESTING_HOUR` -ne $fhend ] ; then
+		fhend=`expr \( $modf + 1 \) \* $NESTING_HOUR`
+	fi
+	fh=0
+	while [ $fh -le $fhend ] ; do
+		FH=`expr $fh + $h`
+		FH=`expr \( $FH \/ $NESTING_HOUR \) \* $NESTING_HOUR`
+		if [ $FH -gt $ENDHOUR ] ; then
+			break
+		fi
+		if [ $FH -lt 10 ]; then FH=0$FH; fi
+		if [ ! -s base_sig.ft$FH ] ; then
+			FYYYYMMDDHH=`@ETC_DIR@/maketim $YYYYS$MMS$DDS$HHS -h $FH`
+			YYYYF=`eval echo $FYYYYMMDDHH | cut -c1-4`
+			MMF=`eval echo $FYYYYMMDDHH | cut -c5-6`
+			DDF=`eval echo $FYYYYMMDDHH | cut -c7-8`
+			HHF=`eval echo $FYYYYMMDDHH | cut -c9-10`
+			BASE_SIG=base.\${FYYYYMMDDHH}
+			fname=`eval echo $BASE_SIG`
+	        cp base_sig.ft00 $fname
+		fi
+		fh=`expr $fh + $NESTING_HOUR`
+	done
+	#
+	#  generate forecast namelist data
+	#
+	YYYY=`@ETC_DIR@/maketim $YYYYS$MMS$DDS$HHS -h $h | cut -c 1-4`
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB ICE_GRB
+	@RUNSCR_DIR@/r_fcstparm $INCHOUR $ENDHOUR $DELTAT_REG \
+		$NESTING_HOUR $INTPOST $INTSFCX $INTOMLX $LOCDF_REG $INTRESTART || exit 8
+	#
+	#  Execute forecast
+	#
+	export MP_SET_NUMTHREADS
+	inchour=$INCHOUR
+	prthour=$INTPOST
+	export h hx inchour prthour
+	if [ "$BATCHQUE" = qsub ]; then
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		log_name="r_fcst.e`echo $fcstid | cut -d'.' -f1`"
+	elif [ "$BATCHQUE" = llsubmit ]; then
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		log_name="r_fcst.e`echo $fcstid | cut -d'.' -f2`"
+	elif [ "$BATCHQUE" = bsub ]; then
+		fcstid0=`$BATCHQUE < @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
+		log_name="fcst.e`echo $fcstid`"
+	else
+        fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst`
+	fi
+	if [ "$BATCHQUE" != "" ]; then
+		@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+	fi
+	#
+	#  copy files for next forecast segment
+	#
+	cp r_sigit.ft$hx  r_sigit   || exit 8
+	mv r_sigit.ft$hx  r_sig.ft$hx   || exit 8
+	mv r_sigitdt.ft$hx r_sigitdt || exit 8
+	#
+	#  post processing
+	#
+	if [ @DOPOST@ = yes ] ; then
+		if [ "$IDEAL_EXP" = warm -o "$IDEAL_EXP" = cold ]; then
+			hx_sec=`expr $hx \* 3600`
+			@RUNSCR_DIR@/r_sgb $h ${hx_sec} ${INTPOST_SEC} || exit 8
+		else
+			@RUNSCR_DIR@/r_pgb $h $hx $INTPOST || exit 8
+		fi
+	elif [ @CATPGB@ = yes ] ; then
+		@ETC_DIR@/catpgb
+	fi
+	/bin/rm -f r_sigit.ft$hx r_sigitdt.ft$hx base.ft$hx
+	#
+	h=$hx
+done
+#
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+	lamclean
+	lamhalt
+fi
+#
+/bin/rm -f r_sigit r_sigitdt
+exit 0

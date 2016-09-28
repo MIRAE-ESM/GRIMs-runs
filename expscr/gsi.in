@@ -1,0 +1,73 @@
+#!/bin/sh
+set -x
+#
+# this script makes gmp analysis using gsi. version 3.0, september 2012
+# sigma cycling is done every 6hr, producing 12 hr forecasts with 3-hr output
+# inverval for 3dvar plus fgat
+#
+# grims-gsi was created by byung-kwon park, and implemented by songyou hong
+#            september 2012
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+RUNNAME=bbk
+export $RUNMAME
+#
+# define date 
+#
+BEG_YYYYMMDDHH=2010082200
+END_YYYYMMDDHH=2010083118
+#
+# If you wish, you may modify OUTPUT_DIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+OBS_DIR=/data5/bbk/obs
+OUTPUT_DIR=@CURR_DIR@           
+#
+# ------------- below for expert user only -------------------------------------
+#
+export CUR_DATE=$BEG_YYYYMMDDHH
+#
+while [ $CUR_DATE -le $END_YYYYMMDDHH ] ;do
+#
+export 	PRE_DATE=`@ETC_DIR@/validate.s $CUR_DATE -6`
+	CUR_YYYYMMDD=`echo $CUR_DATE|cut -c1-8`
+export 	OBS_DIR_DATE=$OBS_DIR/$CUR_YYYYMMDD
+#
+#   define directory for observation, model execution, and model output
+#
+	GMP_DIR=$OUTPUT_DIR/$RUNNAME/$CUR_DATE
+export 	GSI_DIR=$OUTPUT_DIR/$RUNNAME/$CUR_DATE/gsi
+export 	GES_DIR=$OUTPUT_DIR/$RUNNAME/$PRE_DATE
+	mkdir -p $GMP_DIR $GSI_DIR $ANAL_SIG_DIR $GES_DIR
+#
+#   convert gmp sigma/sfc output (native bin) to the gsi format (ieee)
+#
+	@RUNSCR_DIR@/gmp2gsi $PRE_DATE $GES_DIR $GSI_DIR || exit 8
+#
+#   do gsi cycleing 
+#
+	qsub -V -j eo @CURR_DIR@/gsi_cycle
+	while [ ! -s $GSI_DIR/biascr.$CUR_DATE ] ;do
+		sleep 160
+	done
+#
+#   convert gsi sigma/sfc output (ieee) to the gmp  format (native bin)
+#
+	@RUNSCR_DIR@/gsi2gmp $CUR_DATE $GSI_DIR $GMP_DIR || exit 8
+#
+#   do gmp execution for 12 hour with 3-hr output inverval
+#
+	@CURR_DIR@/gsi_gmp $CUR_DATE 12 $GMP_DIR $GES_DIR $OBS_DIR_DATE
+	while [ ! -s $GMP_DIR/sig.ft12 ] ;do
+	  sleep 160
+	done
+#
+#   do update analysis time 
+#
+  export CUR_DATE=`@ETC_DIR@/validate.s $CUR_DATE 6`
+#
+done

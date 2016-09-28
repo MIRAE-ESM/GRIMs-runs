@@ -1,0 +1,243 @@
+#!/bin/sh
+#PBS -l mppe=64
+        . /opt/modules/modules/init/sh
+        module load open pbs PrgEnv
+#
+# this script does one cycle of data assimilation.  It is ideal for
+# testing the system on new institution and/or computer
+#
+set -ax
+#
+case=gfs_cold_200607
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+#
+#  16.  sfc0      -- set up surface conditions
+#  18.  fcst      -- atmospheric model integration
+#  19.  pgb       -- sigma to pressure interpolation of analysis field
+#
+list_of_steps='block grepsat edupat fixpaobs edsatw edswnd eddrib ednosat edbuoy check prevents cqc acqc combbufr oiqc ssi sfc0 precipadj fcst pgb postvents'
+#
+#  List of output files from this script
+#
+list_of_output_files="obcycle.anl.bufr stdout0.anl.ascii \
+				cqe.anl.ascii cqb.anl.ascii cqt.anl.ascii \
+				sig.anl.ieee sfc.anl.ieee sig.ft06.ieee sfc.ft06.ieee \
+				fgb.ft00.grib fgb.ft06.grib dg3.ft00.grib dg3.ft06.grib \
+				znl.ft00.native znl.ft06.native oiqc.anl.bufr pgb.anl.grib \
+				ERROR.out"
+#
+#  DEFINE COLDSTART
+#
+cold_start=no
+#
+#   Specify the data directories
+#
+GFS_DIR=/san_tmp/nwpd/users/hsy/GFS_ANAL
+SST_DIR=/san_home/users/bbk/ASST
+#
+INPUT_RESOLUTION=t382k64
+#
+if [ $cold_start = yes ]; then
+   INITIAL_SFC_FILE_TYPE=osu1
+else
+   INITIAL_SFC_FILE_TYPE=`grep '^sfcftyp'  @PWD@/cvar.env | sed 's/.*=//' `
+fi
+#
+SDATE=2006062206
+INT_CYCLE=6
+#
+INCHOUR=$INT_CYCLE
+ENDHOUR=$INT_CYCLE
+INTSFCX=240
+INTOMLX=24
+INTSIG=$INT_CYCLE
+INTSFC=$INT_CYCLE
+INTFLX=$INT_CYCLE
+INTRESTART=24
+#
+fgb_post=1
+#
+FCST_NPES=64
+# -----------------------------------------------------------------------------
+#  DEFINE BEGINING AND ENDING DATES
+#
+RUNS_DIR=`pwd`
+cd $RUNS_DIR
+
+if [ ! -s $RUNS_DIR/anal.tim ] ; then
+        echo "$SDATE" > $RUNS_DIR/anal.tim
+fi
+#
+YYYYS=`cat anal.tim | cut -c1-4`
+MMS=`cat anal.tim | cut -c5-6`
+DDS=`cat anal.tim | cut -c7-8`
+HHS=`cat anal.tim | cut -c9-10`
+YYYYF=2006
+MMF=07
+DDF=31
+HHF=18
+#
+YYYY=$YYYYS
+MM=$MMS
+DD=$DDS
+HH=$HHS
+#
+. $RUNS_DIR/runscr/envset
+#
+yyyymmddhhs=$YYYYS$MMS$DDS$HHS
+yyyymmddhhf=$YYYYF$MMF$DDF$HHF
+yyyymmddhh=$yyyymmddhhs
+#
+#  start of date looP
+#
+ISTART=1
+ftp=no
+p_yyyymmddhh=""
+if [ $yyyymmddhh -le $yyyymmddhhf ] ; then
+	YY=`echo $YYYY | cut -c3-4`
+	century=`expr \( \( $YYYY - 1 \) / 100 \) + 1`
+	yyyymmdd=$YYYY$MM$DD
+	yymmddhh=$YY$MM$DD$HH
+	if [ "$p_yyyymmddhh" = "" ]; then
+		p_yyyymmddhh=`@ETC_DIR@/maketim $yyyymmddhh -$INT_CYCLE`
+	fi
+		p_yyyymmdd00=`@ETC_DIR@/maketim ${yyyymmdd}00 -24`
+		p_yyyymmdd=`echo $p_yyyymmdd00 | cut -c1-8`
+	#
+        GUESDIR=$RUNS_DIR/$case/`echo $p_yyyymmddhh|cut -c1-8`
+	EXECDIR=$RUNS_DIR/$case/`echo $yyyymmddhh|cut -c1-8`
+	mkdir -p $EXECDIR 2>/dev/null
+	cd $EXECDIR || exit 8
+        INITIAL_SIGMA=${GFS_DIR}/xsiganl/siganl_$yyyymmddhh
+        INITIAL_SFC=${GUESDIR}/sfcanl_$yyyymmddhh
+        #
+#
+#  renew log file
+#
+cat $0 > ERROR.out
+echo '==============' >>ERROR.out
+        fmt=`echo $INITIAL_SIGMA | sed 's/.*\.//g'`
+        #
+        # Change input resolution to model resolution
+        #
+        $RUNS_DIR/runscr/chgr \
+                         $INITIAL_SIGMA  $INITIAL_SFC \
+                        sigit sfci \
+                        $INITIAL_SFC_FILE_TYPE || exit 8
+        #
+        #  convert initial sfc file type to model sfc file type
+        #
+         cp $GUESDIR/sfc.ft06.$p_yyyymmddhh sfci
+         cp $SST_DIR/gdps_ncep_sstgrb.${p_yyyymmdd}18 $EXECDIR
+        SST_GRB=$EXECDIR/gdps_ncep_sstgrb.${p_yyyymmdd}18
+	SNO_GRB=@CON_DIR@/clim.snow.r2.1979-1998.grib
+        ICE_GRB=@CON_DIR@/clim.ice.r2.1979-1998.grib
+	SST_GRB_T0=$SST_GRB
+	ICE_GRB_T0=$ICE_GRB
+	SNO_GRB_T0=$SNO_GRB
+	SCV_GRB_T0=
+    iicegrb0=1                      # 0 : use guess, 1 : use grib file
+    isnogrb0=0
+    isstgrb0=1
+    ism2grb0=0
+    iicegrb=$iicegrb0
+    isnogrb=$isnogrb0
+    isstgrb=$isstgrb0
+    ism2grb=$ism2grb0
+	export SST_GRB SNO_GRB ICE_GRB SST_GRB_T0 ICE_GRB_T0 SNO_GRB_T0 SCV_GRB_T0
+	export iicegrb0 isstgrb0 isnogrb0 ism2grb0
+	export iicegrb isstgrb isnogrb ism2grb
+	if [ $MM -eq 7 ]; then
+	if [ $HH -eq 12 -o $HH -eq 00 ]; then
+		ENDHOUR=120
+		INTSIG=12
+		INTFLX=12
+	fi
+	else
+		ENDHOUR=6
+	fi
+	INCHOUR=$ENDHOUR
+	#
+	#  16.  sfc
+	#
+		h=00
+		hx=`expr $h + $INT_CYCLE`
+		if [ $cold_start = yes ]; then
+			fhour=6
+		else
+			fhour=6
+		fi
+        $RUN_DIR/runscr/sfc0  gsm sfci sfco $INITIAL_SFC_FILE_TYPE  $fhour || exit 8
+            cp sfco sfci || exit 8
+            cp sigit sigitdt || exit 8
+            cp sigit sig.anl || exit 8
+            cp sfci  sfc.ft$h || exit 8
+
+	#
+	#  18.  fcst
+	#
+                $RUN_DIR/runscr/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+                      $INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+    #
+    #  Execute forecast
+    #
+		$RUN_DIR/runscr/fcst "$FCSTENV" || exit 8
+	#
+	#  9. Post processing of analysis and forecast
+	#
+		ln -fs sig.anl sig.ft00
+			$RUN_DIR/runscr/pgb 00 $ENDHOUR $INTSIG || exit 8
+            if [ $fgb_post -eq 1 ]; then
+                $RUN_DIR/runscr/fgb 0 $ENDHOUR $INTFLX || exit 8
+            fi
+		fh=00
+		while [ $fh -le $ENDHOUR ] ; do
+			mv pgb.ft$fh pgb.ft$fh.$yyyymmddhh
+			mv fgb.ft$fh fgb.ft$fh.$yyyymmddhh
+			mv sfc.ft$fh sfc.ft$fh.$yyyymmddhh
+			fh=`expr $fh + 6`
+			if [ $fh -lt 10 ]; then
+				fh=0$fh
+			fi
+		done
+	#
+	#  10.2 Convert binary sig.anl and sfc.anl to ieee
+	#
+    #
+    # remove files
+    #
+    fh=00
+    while [ $fh -le $ENDHOUR ] ; do
+        /bin/rm -f sig.ft$fh sfc.ft$fh
+        fh=`expr $fh + 6 `
+        if [ $fh -lt 10 ]; then
+            fh=0$fh
+        fi
+    done
+    /bin/rm -f sfci sfco sigit sigitdt sig.anl sfc.anl bufr* *bufr
+	#
+	#  11. make next time card
+	#
+        cold_start=no
+	p_yyyymmddhh=$yyyymmddhh
+	yyyymmddhh=`@ETC_DIR@/maketim $yyyymmddhh $INT_CYCLE` || exit 8
+	if [ $? -ne 0 ]; then
+		exit 8
+	fi
+	YYYY=`echo $yyyymmddhh|cut -c1-4`
+	MM=`echo $yyyymmddhh|cut -c5-6`
+	DD=`echo $yyyymmddhh|cut -c7-8`
+	HH=`echo $yyyymmddhh|cut -c9-10`
+	echo "increment  to $yyyymmddhh" >>ERROR_out.$yyyymmddhh
+        echo "$yyyymmddhh" > $RUNS_DIR/anal.tim
+	#
+        cd $EXECDIR/../..
+        qsub -q @baram yrs05
+fi
+#

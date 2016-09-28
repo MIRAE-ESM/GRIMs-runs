@@ -1,0 +1,290 @@
+#!/bin/sh 
+#PBS -l mppe=@NPES@
+#
+set -ax
+#
+if [ @SYSTEM@ = x1e ] ; then
+        . /opt/modules/modules/init/sh
+        module load open pbs PrgEnv
+fi
+#
+# this script makes 72 hour integration starting from an example initial
+# condition. ideal for first testing the system on new computer system
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+RUNNAME=g_o3
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+FIRST_DATE=2005120100
+SDATE=2005120100
+EDATE=2005123118
+ENDHOUR=24  
+INCHOUR=6
+INTSFCX=24
+INTOMLX=24
+INTSIG=6
+INTSFC=6
+INTFLX=6
+INTRESTART=24
+SWHR_GBL=1			# interval of short wave radiation flux (default=6)
+LWHR_GBL=3
+#
+fgb_post=1
+#
+#
+FCST_RESTART=yes
+#
+#  ------------- below for expert user only --------------------
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+
+CURRENT_DATE=$SDATE
+
+while [ $CURRENT_DATE -le $EDATE ] ; do
+
+CURRENT_DATE_M1=`@ETC_DIR@/validate.s $CURRENT_DATE -24`
+SYEAR=`echo $CURRENT_DATE|cut -c1-4`
+SYYYYMMDD=`echo $CURRENT_DATE|cut -c1-8`
+PYYYYMMDD=`echo $CURRENT_DATE_M1|cut -c1-8`
+EXECDIR=@PWD@/$RUNNAME/$SYYYYMMDD
+PEXECDIR=@PWD@/$RUNNAME/$PYYYYMMDD
+OUTDIR=@PWD@/$RUNNAME/$SYEAR
+export EXECDIR
+#
+# -------  do not change below  -------------------------------------
+#
+mkdir -p $EXECDIR 2>/dev/null
+mkdir -p $OUTDIR 2>/dev/null
+#
+# -----------------------------------------------------------------------------
+host=`hostname | cut -d . -f1`
+if [ $host = global ];then
+    host_head=''
+else
+    host_head='/global'
+fi
+export INITIAL_DATA_DIR; INITIAL_DATA_DIR=$host_head/disk2/REAN/r2/6hour/sig_sfc
+INITIAL_SIGMA=$INITIAL_DATA_DIR/sig.anl.$CURRENT_DATE.ieee
+
+if [ $CURRENT_DATE = $FIRST_DATE ];then
+INITIAL_SFC=$INITIAL_DATA_DIR/sfc.anl.$CURRENT_DATE.ieee
+INITIAL_SFC_FILE_TYPE=osu1
+else
+INITIAL_SFC=$PEXECDIR/sfc.$CURRENT_DATE
+INITIAL_SFC_FILE_TYPE=osu2
+fi
+#
+#  blank means use guess (in the sfc file).
+#
+SST_ANL_T0=$host_head/disk1/SSTD/amipsst/gisst22.$SYEAR.daily
+ICE_ANL_T0=@CON_DIR@/clim.ice.r2.1979-1998.grib
+SNO_ANL_T0=@CON_DIR@/clim.snow.r2.1979-1998.grib
+SCV_ANL_T0=
+iicegrb0=1                      # 0 : use guess, 1 : use grib file
+isnogrb0=0
+isstgrb0=1
+ism2grb0=0
+SST_ANL=$host_head/disk1/SSTD/amipsst/gisst22.$SYEAR.daily
+ICE_ANL=@CON_DIR@/clim.ice.r2.1979-1998.grib
+SNO_ANL=@CON_DIR@/clim.snow.r2.1979-1998.grib
+SCV_ANL=
+iicegrb=$iicegrb0
+isnogrb=$isnogrb0
+isstgrb=$isstgrb0
+ism2grb=$ism2grb0
+#
+INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
+#
+FCST_NPES=@NPES@
+FCST_NCPUS=@NCPUS@
+#
+# set environmental variables
+#
+. @RUNSCR_DIR@/envset
+#
+#  cd to run directory
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+cd $EXECDIR || exit 8
+#
+#  renew log file
+#
+cat $0 > ERROR.out
+echo '==============' >>ERROR.out
+#
+# Automatic restart
+#
+if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ];then
+	#
+	#  Restart
+	#
+	h=`@ETC_DIR@/fhour sigit`
+	echo fhour in the sigit file = $h
+else
+	#
+	#  Initial start.
+	#
+	h=00
+	#
+	# Conversion from ascii to native format
+	#
+	fmt=`echo $INITIAL_SIGMA | sed 's/.*\.//g'`
+	@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+		@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+		-1:-1:-1:-1:-1 \
+		$fmt:bin $INITIAL_SIGMA:$INITIAL_SFC \
+		cnvrt_initial_sig:cnvrt_initial_sfc || exit 8
+	#
+	# Find initial date and hour
+	#
+	@ETC_DIR@/date cnvrt_initial_sig >date.$$ || exit 8
+	read HH MM DD yyyy FH <date.$$ ; rm date.$$
+	echo $yyyy $MM $DD $HH $FH
+	#
+	# Change input resolution to model resolution
+	#
+	if [ $CURRENT_DATE != $FIRST_DATE ];then
+		ln -fs $OUTDIR/sfc.$CURRENT_DATE cnvrt_initial_sfc
+	fi
+	#
+	@RUNSCR_DIR@/chgr \
+			cnvrt_initial_sig cnvrt_initial_sfc \
+			sigit sfci \
+			$INITIAL_SFC_FILE_TYPE || exit 8
+	#
+	#  convert initial sfc file type to model sfc file type
+	#
+	SST_GRB_T0=`eval echo $SST_ANL_T0`
+	SNO_GRB_T0=`eval echo $SNO_ANL_T0`
+	SCV_GRB_T0=`eval echo $SCV_ANL_T0`
+	ICE_GRB_T0=`eval echo $ICE_ANL_T0`
+	export SST_GRB_T0 SNO_GRB_T0 SCV_GRB_T0 ICE_GRB_T0
+        export iicegrb0 isstgrb0 isnogrb0 ism2grb
+	@RUNSCR_DIR@/sfc0 gsm sfci sfco $INITIAL_SFC_FILE_TYPE || exit 8
+	#
+	cp sfco sfci || exit 8
+	cp sigit sigitdt || exit 8
+	cp sigit sig.ft$h || exit 8
+	cp sfci  sfc.ft$h || exit 8
+	#
+	@ETC_DIR@/date sigit >date.$$ || exit 8
+	read HH MM DD yyyy FH <date.$$ ; rm date.$$
+	echo $yyyy $MM $DD $HH $FH
+	#
+	#  pgb of the initial
+	#
+	if [ @DOPOST@ = yes ] ; then
+		if [ "@BATCHJOB@" = "" ]; then
+			@RUNSCR_DIR@/pgb $h $h $INTSIG || exit 8
+		else
+			if [ "@BATCHQUE@" = qsub ]; then
+				@BATCHJOB@ -v fhs=$h,fhe=$h,fhinc=$INTSIG \
+					@RUNSCR_DIR@/pgb
+			else
+				@BATCHJOB@  @RUNSCR_DIR@/pgb
+			fi
+		fi
+	elif [ @CATPGB@ = yes ] ; then
+		@ETC_DIR@/catpgb
+	fi
+fi
+#
+#  forecast hour loop
+#
+xc=0
+while [ $h -lt $ENDHOUR ] ; do
+	#
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -gt $ENDHOUR ] ; then
+		hx=$ENDHOUR
+	fi
+	if [ $hx -lt 10 ];then hx=0$hx;fi
+	#
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	SCV_GRB=`eval echo $SCV_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
+	export SWHR_GBL LWHR_GBL
+	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+			$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+	#
+	#  Execute forecast
+	#
+    if [ "$BATCHQUE" = qsub ]; then
+        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+        log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
+    elif [ "$BATCHQUE" = llsubmit ]; then
+        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+        log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
+    elif [ "$BATCHQUE" = bsub ]; then
+        fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+        fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
+        log_name="fcst.e`echo $fcstid`"
+    fi
+	#
+	#  pgb of the forecast
+	#
+	if [ @DOPOST@ = yes ] ; then
+		if [ "@BATCHJOB@" = "" ]; then
+			@RUNSCR_DIR@/pgb $INTSIG $hx $INTSIG || exit 8
+            if [ $fgb_post -eq 1 ]; then
+                @RUNSCR_DIR@/fgb 0 $hx $INTFLX || exit 8
+            fi
+		else
+			if [ "@BATCHQUE@" = qsub ]; then
+				lastid=`@BATCHJOB@ -W depend=afterok:$fcstid -v fhs=$INTSIG,fhe=$hx,fhinc=$INTSIG \
+					@RUNSCR_DIR@/pgb`
+                if [ $fgb_post -eq 1 ]; then
+                    lastid=`@BATCHJOB@ -W depend=afterok:$fcstid -v fhs=0,fhe=$hx,fhinc=$INTFLX \
+                    	@RUNSCR_DIR@/fgb`
+                fi
+			else
+				# needs some modification (ex. ibm)
+				@BATCHJOB@  @RUNSCR_DIR@/pgb
+                if [ $fgb_post -eq 1 ]; then
+                    @BATCHJOB@  @RUNSCR_DIR@/fgb
+                fi
+			fi
+		fi
+	elif [ @CATPGB@ = yes ] ; then
+		@ETC_DIR@/catpgb
+	fi
+	if [ "@BATCHQUE@" = qsub ]; then
+		@RUNSCR_DIR@/wait_que_job $lastid $log_name || exit 8
+	fi
+    if [ $fgb_post -eq 1 ]; then
+		@RUNSCR_DIR@/delfile flx 0 $hx $INTFLX || exit 8
+	fi
+	CURRENT_DATE=`@ETC_DIR@/validate.s $CURRENT_DATE $INCHOUR`
+	YYYY=`echo $CURRENT_DATE|cut -c1-4`
+	MM=`echo $CURRENT_DATE|cut -c5-6`
+	DD=`echo $CURRENT_DATE|cut -c7-8`
+	HH=`echo $CURRENT_DATE|cut -c9-10`
+	in_sig=sig.ft$hx
+	in_sfc=sfc.ft$hx
+	out_sig=$OUTDIR/sig.$CURRENT_DATE
+	out_sfc=$OUTDIR/sfc.$CURRENT_DATE
+	@RUNENV@ @RUNSCR_DIR@/chgdates $YYYY:$MM:$DD:$HH:0 $in_sig:$in_sfc $out_sig:$out_sfc || exit 8
+	@ETC_DIR@/force_grib_date_mon_fhr pgb.ft$hx $CURRENT_DATE || exit 8
+	mv pgb.ft$hx $OUTDIR/pgb.ft$CURRENT_DATE || exit 8
+	rm -rf $PEXECDIR
+  #
+  h=$hx
+done
+done
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+        lamclean
+        lamhalt
+fi

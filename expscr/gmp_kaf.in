@@ -1,0 +1,334 @@
+#!/bin/sh 
+#PBS -V
+#PBS -l select=1:ncpus=1:mpiprocs=1
+#PBS -N GRIMs_main
+#PBS -j oe
+#PBS -o GRIMs_main.out
+set -ax
+#
+# this script makes 24*15 hour integration starting from an example initial
+# condition. ideal for first testing the system on new computer system
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+RUNNAME=@RUNNAME@       # Experimental name
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+SDATE=@STARTTIME@       # Starting forecast date
+ENDHOUR=@FCSTHR1@       # Length of model integration in hour
+#ENDHOUR=`expr 24 \* 15` # Length of model integration in hour
+INTPOST=48              # Time interval to create output files for the first execution
+INCHOUR=$INTPOST        # Forecast hour for the first execution
+INTSFCX=10000000        # Time interval to run surface merging
+INTOMLX=24              # Time interval to run ocean mixed layer model
+INTSIG=3                # Time interval to create sigma output file
+INTSFC=$INTSIG          # Time interval to create surface output file
+INTFLX=$INTSFC          # Time interval to create surface flux output file
+INTSIG2=6               # Time interval to create sigma output file after first execution
+INTSFC2=$INTSIG2        # Time interval to create surface output file after first execution
+INTFLX2=$INTSFC2        # Time interval to create surface flux output file after first execution
+INTRESTART=$ENDHOUR     # Time interval to restart the model
+SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
+LWHR_GBL=3              # Time interval of longwave  radiation flux
+#
+DEL_FLUX=no             # Option deleting flux file after forecst (yes;no)
+FCST_RESTART=yes        # Option indicating whether current forecast is first
+SFC_FCST=yes            # Option using surface fcst data
+SFC_ASSI_HOUR=12        # Time interval of surface fcst data
+#
+# ------------- below for expert user only -------------------------------------
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+SYEAR=`echo $SDATE|cut -c1-4`
+SMON=`echo $SDATE|cut -c5-6`
+SDAY=`echo $SDATE|cut -c7-8`
+SHOUR=`echo $SDATE|cut -c9-10`
+SYYYYMMDD=`echo $SDATE|cut -c1-8`
+#
+EXECDIR=@OUTPUT_DIR@/$SDATE
+export EXECDIR
+#
+# -------------  do not change below  ------------------------------------------
+#
+mkdir -p $EXECDIR 2>/dev/null
+#
+INPUTDIR=@GFSDIR@/${SYYYYMMDD}                          # Directory for GFS analysis data 
+#INPUTDIR=/data6/msk/GFS/GFS/gfs.${SDATE}                # Directory for GFS analysis data 
+SFCDIR=${INPUTDIR}                                      # Directory for sst, sno, ice data
+#SFCDIR=/data3/bbk/obs/${SYYYYMMDD}
+FHOUR=`expr $SFC_ASSI_HOUR \* -1`
+FDATE=`@ETC_DIR@/validate.s ${SDATE} ${FHOUR}`
+FCSTDIR=@OUTPUT_DIR@/${FDATE}
+#
+INITIAL_SIGMA=${INPUTDIR}/${SYYYYMMDD}_gfs.t${SHOUR}z.sanl
+INITIAL_SFC_ANAL=${INPUTDIR}/${SYYYYMMDD}_gfs.t${SHOUR}z.sfcanl
+INITIAL_SFC_FCST=${FCSTDIR}/sfc.ft${SFC_ASSI_HOUR}
+INITIAL_SFC_FILE_TYPE=noa1
+#
+# blank means use guess (in the sfc file).
+#
+SST_ANL_T0=${SFCDIR}/${SYYYYMMDD}_gdas1.t${SHOUR}z.sstgrb.grib2
+ICE_ANL_T0=${SFCDIR}/${SYYYYMMDD}_gdas1.t${SHOUR}z.engicegrb.grib2
+SNO_ANL_T0=${SFCDIR}/${SYYYYMMDD}_gdas1.t${SHOUR}z.snogrb.grib2
+SCV_ANL_T0=
+#
+iicegrb0=1              # 0 : use guess, 1 : use grib file
+isnogrb0=1
+isstgrb0=1
+ism2grb0=0
+#
+SST_ANL=${EXECDIR}/cnvrt_initial_sst
+ICE_ANL=${EXECDIR}/cnvrt_initial_ice
+SNO_ANL=${EXECDIR}/cnvrt_initial_sno
+SCV_ANL=
+#
+iicegrb=$iicegrb0
+isnogrb=$isnogrb0
+isstgrb=$isstgrb0
+ism2grb=$ism2grb0
+#
+INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
+#
+FCST_NPES=@NPES@
+FCST_NCPUS=@NCPUS@
+#
+# set environmental variables
+#
+. @RUNSCR_DIR@/envset
+#
+# cd to run directory
+#
+#scrnam=`echo $0 | sed 's?.*/??g'`
+scrnam="grims"
+#cp $0 $EXECDIR/0LOG.$scrnam
+cp $scrnam $EXECDIR/0LOG.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+cd $EXECDIR || exit 8
+#
+# renew log file
+#
+#cat @PWD@/$0 > ERROR.out
+cat @PWD@/$scrnam > ERROR.out
+echo '==============' >>ERROR.out
+#
+# Automatic restart
+#
+if [ @BARO_TEST@ != 1 ]; then
+	if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ]; then
+		#
+		# Restart
+		#
+		h=`@ETC_DIR@/fhour sigit`
+		echo fhour in the sigit file = $h
+	else
+		#
+		# co2
+		#
+		echo 'CO2 process...'
+		if [ ! -s co2con ] ; then
+			@RUNSCR_DIR@/co2 || exit 8
+		fi
+		#
+		# mountain
+		#
+		echo 'Mountain process...'
+		if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
+			@RUNSCR_DIR@/mtn || exit 8
+		fi
+		#
+		# Initial start.
+		#
+		h=00
+		#
+		# Conversion from GFS ieee to GRIMs binary format
+		#
+		fmt=`echo $INITIAL_SIGMA | sed 's/.*\.//g'`
+		if [ -s $INITIAL_SIGMA -a \( -s $INITIAL_SFC_ANAL -o -s $INITIAL_SFC_FCST \) ]; then
+			echo 'Conversion from GFS ieee to GRIMs binary format...'
+			if [ "$SFC_FCST" = no ]; then
+				@ETC_DIR@/scnvrt_gfs gsm noa1 \
+						@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+						-1:-1:-1:-1:-1 \
+						ieee:bin $INITIAL_SIGMA:$INITIAL_SFC_ANAL \
+						cnvrt_initial_sig:cnvrt_initial_sfc || exit 8
+			else
+				@ETC_DIR@/scnvrt_gfs gsm noa1 \
+						@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+						-1:-1:-1:-1:-1 \
+						ieee:bin $INITIAL_SIGMA:dummy \
+						cnvrt_initial_sig:dummy || exit 8
+			fi
+		else
+			echo 'Initial sigma or surface data is empty.' ; exit 8
+		fi
+		#
+		# Format conversion from grib2 to grib1
+		#
+		echo 'Format conversion from grib2 to grib1...'
+		if [ -s $SST_ANL_T0 ]; then
+			@ETC_DIR@/cnvgrib -g21 ${SST_ANL_T0} ${SST_ANL}
+		else
+			echo 'SST data is empty.' ; exit 8
+		fi
+		if [ -s $ICE_ANL_T0 ]; then
+			@ETC_DIR@/cnvgrib -g21 ${ICE_ANL_T0} ${ICE_ANL}
+		else
+			echo 'ICE data is empty.' ; exit 8
+		fi
+		if [ -s $SNO_ANL_T0 ]; then
+			@ETC_DIR@/cnvgrib -g21 ${SNO_ANL_T0} ${SNO_ANL}
+		else
+			echo 'SNOW data is empty.' ; exit 8
+		fi
+		#
+		# Find initial date and hour
+		#
+		echo 'Find initial date and hour...'
+		@ETC_DIR@/date cnvrt_initial_sig >date.$$ || exit 8
+		read HH MM DD YYYY FH <date.$$ ; rm date.$$
+		echo $YYYY $MM $DD $HH $FH
+		#
+		# Change input resolution to model resolution
+		#
+		echo 'Change input resolution to model resolution...'
+		if [ "$SFC_FCST" = no ]; then
+			@RUNSCR_DIR@/chgr cnvrt_initial_sig cnvrt_initial_sfc \
+						sigit sfci $INITIAL_SFC_FILE_TYPE || exit 8
+		else
+			@RUNSCR_DIR@/chgr cnvrt_initial_sig dummy \
+						sigit dummy $INITIAL_SFC_FILE_TYPE || exit 8
+		fi
+        #
+        # Surface field
+        #
+        if [ "$SFC_FCST" = yes ]; then
+                cp $FCSTDIR/sig.ft$SFC_ASSI_HOUR sig_guess  || exit 8
+                cp $INITIAL_SFC_FCST sfc_guess  || exit 8
+                @ETC_DIR@/date sfc_guess >date.$$ || exit 8
+                read BHH BMM BDD BYYYY BFH <date.$$ ; rm date.$$
+                sfc_guess_fcst=`@ETC_DIR@/validate.s $BYYYY$BMM$BDD$BHH $BFH`
+                if [ $SDATE != $sfc_guess_fcst ]; then
+                    echo 'Starting time and fcst time in sfc file are not same.' ; exit 8
+                fi
+                @RUNENV@ @RUNSCR_DIR@/chgdates $YYYY:$MM:$DD:$HH:0 \
+                                sig_guess:sfc_guess dummy:sfci || exit 8
+        fi
+		#
+		# Convert initial sfc file type to model sfc file type
+		#
+		echo 'Convert initial sfc file type to model sfc file type...'
+		SST_GRB_T0=`eval echo $SST_ANL`
+		SNO_GRB_T0=`eval echo $SNO_ANL`
+		SCV_GRB_T0=`eval echo $SCV_ANL`
+		ICE_GRB_T0=`eval echo $ICE_ANL`
+		export SST_GRB_T0 SNO_GRB_T0 SCV_GRB_T0 ICE_GRB_T0
+		export iicegrb0 isstgrb0 isnogrb0 ism2grb
+       	@RUNSCR_DIR@/sfc0 gsm sfci sfco $INITIAL_SFC_FILE_TYPE || exit 8
+		#
+		cp sfco  sfci     || exit 8
+		cp sigit sigitdt  || exit 8
+		cp sigit sig.ft$h || exit 8
+		cp sfci  sfc.ft$h || exit 8
+		#
+		@ETC_DIR@/date sigit >date.$$ || exit 8
+		read HH MM DD YYYY FH <date.$$ ; rm date.$$
+		echo $YYYY $MM $DD $HH $FH
+	fi
+else
+	h=0
+fi
+#
+#  forecast hour loop
+#
+xc=0
+while [ $h -lt $ENDHOUR ] ; do
+	#
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -gt $ENDHOUR ] ; then
+		hx=$ENDHOUR
+	fi
+	if [ $hx -gt $INTPOST ] ; then
+		if [ $h -lt $INTPOST ] ; then
+			INCHOUR=`expr $INTPOST - $h`
+			hx=$INTPOST
+		else
+			INCHOUR=`expr $ENDHOUR - $h`
+			hx=$ENDHOUR
+			INTSIG=$INTSIG2
+			INTSFC=$INTSFC2
+			INTFLX=$INTFLX2
+		fi
+	fi
+	if [ $hx -lt 10 ];then hx=0$hx;fi
+	#
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	SCV_GRB=`eval echo $SCV_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
+	export SWHR_GBL LWHR_GBL
+	echo 'Make fcst.parm file...'
+	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+	#
+	# Execute forecast
+	#
+	echo '----------------'
+	echo 'Execute forecast'
+	echo '----------------'
+	fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+#	log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
+	log_name="GRIMs_fcst.out"
+	#
+	# Postprocess (pgb, fgb)
+	#
+	if [ @BARO_TEST@ != 1 ]; then
+		if [ @DOPOST@ = yes ] ; then
+			#
+			# Do post immediately when next forecast file is found.
+			#
+			echo 'Postprocessing...'
+			if [ $h -eq 0 ]; then
+				pshour=$h
+			else
+				pshour=`expr $h + $INTSIG`
+			fi
+			@RUNSCR_DIR@/post_gmp $pshour $hx $INTSIG $fcstid $log_name $BATCHQUE $BATCHstatus
+            #
+            # delete flux file
+            #
+            if [ "$DEL_FLUX" = yes ]; then
+                echo 'Delete flux file'
+                @RUNSCR_DIR@/delfile flx 0 $hx $INTFLX || exit 8
+            fi
+			#
+			# find archive files
+			#
+			#cp sig.ft$hx sigit || exit 8
+			#mv sigp.ft$hx sigitdt  || exit 8
+			cp sfc.ft$hx sfci || exit 8
+		elif [ @CATPGB@ = yes ] ; then
+			@ETC_DIR@/catpgb
+		fi
+	fi
+	#
+	h=$hx
+done
+#
+wait
+rm -f *.parm
+rm -f fcst.e* fcst.o* pgb.o* pgb.e* fgb.o* fgb.e*
+echo "`date` $0: Completely ended"
+#
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+	lamclean
+	lamhalt
+fi

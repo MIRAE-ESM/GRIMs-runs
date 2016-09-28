@@ -1,0 +1,325 @@
+#!/bin/sh
+#
+#  read r_sigit file in the restart directory and locate proper qsub script
+#  and submit.  also chains multiple scripts to execute one after another
+#
+#  set RUNNAME that identifies this experiment
+#
+ls -p | grep '/' | grep '[ABCDEFGHIJKLMNOPQRSTUVWXYZ]_.*' >/dev/null 2>/dev/null
+if [ $? -gt 0 ] ; then
+	echo "No runname available.  run rsim_ini"
+	exit 8
+else
+	echo "The following RUNNAME is available in this directory:"
+	ls -p | grep '/' | grep '[ABCDEFGHIJKLMNOPQRSTUVWXYZ]_.*' | sed 's%/%%g' >out$$
+	lines=`wc -l out$$ | sed "s/out$$//g"`
+	cat out$$
+	if [ $lines -gt 1 ] ; then
+		echo "Type RUNAME."
+		read RUNNAME
+	else	
+		RUNNAME=`cat out$$`
+	fi
+	rm out$$
+fi
+#
+#------------- do not change below ----------------------------
+#
+# important directories
+#
+RUNS_DIR=`pwd`
+RUNSCR_DIR=$RUNS_DIR/runscr
+QSUB_DIR=$RUNS_DIR/$RUNNAME/qsub
+RESTART_DIR=$RUNS_DIR/$RUNNAME/restart
+INI_COMPUTE_DIR=$RUNS_DIR/$RUNNAME/compute
+#
+#  sumbit defined in rsim_prp
+#
+SUBMIT=`grep '^SUBMIT=' ./$RUNNAME/vars | cut -d'=' -f2`
+#
+#  YYYY,MM,DD,HH of initial condition from r_sigit file  in the restart 
+#  directory
+#
+$RUNSCR_DIR/date $INI_COMPUTE_DIR/r_sigit >date.$$
+read HH_INI MM_INI DD_INI YYYY_INI FH_INI <date.$$ ; rm date.$$
+echo HH_INI MM_INI DD_INI YYYY_INI FH_INI = $HH_INI $MM_INI $DD_INI $YYYY_INI $FH_INI
+#
+#  working directory is qsub directory
+#
+cd $QSUB_DIR || exit 8
+#
+# delete extra qsub scripts created for chaining.
+#
+rm rsim_qsub*.tmp 2>/dev/null
+#
+#  get initial date and forecast hour of the r_sigit file in restart directory
+#
+$RUNSCR_DIR/date $RESTART_DIR/r_sigit >date.$$
+read HH MM DD YYYY FH <date.$$ ; rm date.$$
+echo "YYYY MM DD HH =$YYYY $MM $DD $HH $FH"
+if [ $MM != 01 -o $DD != 01 -o $HH != 00 ] ; then
+	if [ $YYYY != $YYYY_INI -o $MM != $MM_INI -o $DD != $DD_INI -o \
+		$HH != $HH_INI ] ; then
+		echo "This is not rsim history file"
+		exit 8
+	else
+		echo "Warning: Initial cold start not from Jan 1"
+	fi
+fi
+#
+#  scan available rsim_qsub file
+#
+submit_file=
+count=0
+fh=`expr $FH + 0`
+totaljobs=999
+yyyy=$YYYY
+found=no
+#
+ls rsim_qsub.$YYYY* >/dev/null 2>/dev/null
+if [ $? -ne 0 ] ; then
+	echo "No appropriate qsub script found.  Run rsim_prp."
+	exit 8
+fi
+#
+#  loop for qsub scripts of the restart year 
+#
+echo rsim_qsub.$YYYY.ft[0-9][0-9]-* | grep '\[' >/dev/null 2>/dev/null
+if [ $? -ne 0 ] ; then
+	file1=`ls rsim_qsub.$YYYY.ft[0-9][0-9]-*`
+else
+	file1=
+fi
+echo rsim_qsub.$YYYY.ft[0-9][0-9][0-9]-* | grep '\[' >/dev/null 2>/dev/null
+if [ $? -ne 0 ] ; then
+	file2=`ls rsim_qsub.$YYYY.ft[0-9][0-9][0-9]-*`
+else
+	file2=
+fi
+echo rsim_qsub.$YYYY.ft[0-9][0-9][0-9][0-9]-* | grep '\[' >/dev/null 2>/dev/null
+if [ $? -ne 0 ] ; then
+	file3=`ls rsim_qsub.$YYYY.ft[0-9][0-9][0-9][0-9]-*`
+else
+	file3=
+fi
+for file in $file1 $file2 $file3
+do
+	# 
+	# find starting and ending forecast hour from file name
+	#
+	ft=`echo $file | cut -d'.' -f3`
+	ft1=`echo $ft | cut -d'-' -f1 | sed 's/ft//g'`
+	ft2=`echo $ft | cut -d'-' -f2`
+	ft1=`expr $ft1 + 0`
+	ft2=`expr $ft2 + 0`
+	#
+	#  find first time when fh lies between ft1 and ft2
+	#
+	if [ $found = no -a $fh -lt $ft1 ] ; then
+		continue
+	fi
+	if [ $fh -ge $ft1 -a $fh -lt $ft2 ] ; then
+		#
+		# first qsub file found
+		#
+		found=yes
+		count=1
+		#
+		#  if $fh -gt $ft1, then create a new qsub file that matches 
+		#  the forecast hour range.  This procedure is a little messy.
+		#
+		if [ $fh -gt $ft1 ] ; then
+			$RUNSCR_DIR/incdte $YYYY_INI $MM_INI $DD_INI $HH_INI $fh >dteout$$ || exit 8
+			read INI_YYYY INI_MM INI_DD INI_HH <dteout$$ ; rm dteout$$
+			sed "s/from $YYYY_INI$MM_INI$DD_INI$HH_INI to/from $INI_YYYY $INI_MM $INI_DD $INI_HH/g" $file | \
+			sed "s/ft$ft1-$ft2/ft$fh-$ft2/g" | \
+			sed "s/from fhour=$ft1/from fhour=$fh/g" >rsim_qsub.int.$YYYY_INI.ft$fh-$ft2
+			chmod a+x rsim_qsub.int.$YYYY_INI.ft$fh-$ft2
+			file=rsim_qsub.int.$YYYY_INI.ft$fh-$ft2
+			submit_file=$file
+			if [ $count -eq $totaljobs ] ; then
+				break
+			fi
+			continue
+		fi
+		submit_file=$file
+		continue
+	fi
+	#
+	#  remaming files should be added if more than one file
+	#  is requested to submit.
+	# 
+	if [ $found = yes ] ; then
+		if [ $count -eq $totaljobs ] ; then
+			break
+		fi
+		count=`expr $count + 1`
+		submit_file="$submit_file $file"
+	fi
+done
+#
+# look for more qsub files for the following years if
+# more than one file is requested to submit
+#
+if [ $count -lt $totaljobs ] ; then
+	YYYY=`expr $YYYY + 1`
+	while [ $YYYY -le 2100 ] ; do
+		ls rsim_qsub.$YYYY* >/dev/null 2>/dev/null
+		if [ $? -ne 0 ] ; then
+			break
+		fi
+		echo rsim_qsub.$YYYY.ft[0-9][0-9]-* | grep '\[' >/dev/null 2>/dev/null
+		if [ $? -ne 0 ] ; then
+			file1=`ls rsim_qsub.$YYYY.ft[0-9][0-9]-*`
+		else
+			file1=
+		fi
+		echo rsim_qsub.$YYYY.ft[0-9][0-9][0-9]-* | grep '\[' >/dev/null 2>/dev/null
+		if [ $? -ne 0 ] ; then
+			file2=`ls rsim_qsub.$YYYY.ft[0-9][0-9][0-9]-*`
+		else
+			file2=
+		fi
+		echo rsim_qsub.$YYYY.ft[0-9][0-9][0-9][0-9]-* | grep '\[' >/dev/null 2>/dev/null
+		if [ $? -ne 0 ] ; then
+			file3=`ls rsim_qsub.$YYYY.ft[0-9][0-9][0-9][0-9]-*`
+		else
+			file3=
+		fi
+		for file in $file1 $file2 $file3
+		do
+			submit_file="$submit_file $file"
+			count=`expr $count + 1`
+			if [ $count -eq $totaljobs ] ; then
+				break 2
+			fi
+		done
+		YYYY=`expr $YYYY + 1`
+	done
+fi
+#
+#  submit job
+#
+if [ ! -z "$submit_file" ] ; then
+	echo "you have $count forecast(s) that can be submitted in sequence"
+	if [ ! -z "$1" ] ; then
+		echo "Type number of jobs to submit in sequence."
+		read number
+	else
+		number=$count
+	fi
+	cnt=1
+	subtmp=
+	for job in $submit_file
+	do
+		subtmp="$subtmp $job"
+		cnt=`expr $cnt + 1`
+		if [ $cnt -gt $number ] ; then
+			break
+		fi
+	done
+	if [ $number -ne $count ] ; then
+		submit_file=$subtmp
+	fi
+	if [ ! -z "$1" ] ; then
+		if [ $SUBMIT = qsub_es ] ; then
+			echo "es qsub $submit_file  Are you sure?"
+		elif [ $SUBMIT = qsub ] ; then
+			echo "qsub $submit_file  Are you sure?"
+		elif [ $SUBMIT = llsubmit ] ; then
+			echo "llsubmit $submit_file  Are you sure?"
+		elif [ $SUBMIT = sh ] ; then
+			echo "shell submit $submit_file in sequence. Are you sure?"
+		fi
+		read yn
+	else
+		yn=y
+	fi
+	if [ "$yn" = y ] ; then
+		if [ $SUBMIT = qsub_es ] ; then
+			#
+			#  if more than one qsub jobs requested, ES allows to
+			#  qsub multiple jobs by providing multiple jobs separated
+			#  by space in the qsub statement
+			#
+			qsub $submit_file
+		elif [ $SUBMIT = qsub ] ; then
+			#
+			#  if more than one qsub jobs requested, then chaning them
+			#  by adding qsub nextjob at the end of the script
+			#
+			if [ $number -gt 1 ] ; then
+				prevfile=
+				cnt=1
+				for file in $submit_file
+				do
+					if [ ! -z "$prevfile" ] ; then
+						cat $prevfile >$prevfile.tmp
+						if [ $cnt -lt $count ] ; then
+							echo "qsub $QSUB_DIR/$file.tmp" >>$prevfile.tmp
+						else
+							echo "qsub $QSUB_DIR/$file" >>$prevfile.tmp
+						fi
+						chmod a+x $prevfile.tmp
+					fi
+					prevfile=$file
+					cnt=`expr $cnt + 1`
+					if [ $cnt -gt $number ] ; then
+						break
+					fi
+				done
+				first_file=`echo $submit_file | awk '{print $1}'`
+				echo qsub $first_file.tmp
+				qsub $first_file.tmp
+			else
+				qsub $submit_file
+			fi
+		elif [ $SUBMIT = llsubmit ] ; then
+			#
+			#  if more than one qsub jobs requested, then chaning them
+			#  by adding llsubmit nextjob at the end of the script
+			#
+			if [ $number -gt 1 ] ; then
+				prevfile=
+				cnt=1
+				for file in $submit_file
+				do
+					if [ ! -z "$prevfile" ] ; then
+						cat $prevfile > $prevfile.tmp
+						if [ $cnt -lt $count ] ; then
+							echo "llsubmit $QSUB_DIR/$file.tmp" >>$prevfile.tmp
+						else
+							echo "llsubmit $QSUB_DIR/$file" >>$prevfile.tmp
+						fi
+						chmod a+x $prevfile.tmp
+					fi
+					prevfile=$file
+					cnt=`expr $cnt + 1`
+					if [ $cnt -gt $number ] ; then
+						break
+					fi
+				done
+				first_file=`echo $submit_file | awk '{print $1}'`
+				echo llsubmit $first_file.tmp
+				llsubmit $first_file.tmp
+			else
+				llsubmit $submit_file
+			fi
+		elif [ $SUBMIT = sh ] ; then
+			#
+			# simply submit job one after the other
+			#
+			for sfile in $submit_file
+			do
+				$sfile
+				if [ $? -ne 0 ] ; then
+					echo "error in $sfile"
+					exit 8
+				fi
+			done
+		fi
+		exit
+	fi
+else
+	echo "No appropriate qsub script found.  Run rsim_prp."
+fi

@@ -1,0 +1,531 @@
+#!/bin/sh
+#
+#  this script makes ensemble hindcasts from R-2.  Monthly averages
+#  are computed and results are archived to given ftp site
+#
+set -ax
+if [ @SYSTEM@ = x1e ] ; then
+        . /opt/modules/modules/init/sh
+        module load open pbs PrgEnv
+fi
+#
+# ---------------  User changeable parameters  -------------------------
+#
+# run directory
+#
+RUNNAME=gsim_out
+#
+# If you wish, you may modify EXPDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+EXPDIR=@PWD@/$RUNNAME
+#
+#
+# Initial year, month, day, hour of the first ensemble member
+#
+YYYYSTART=1997
+YYYYEND=1997
+LENMON=4
+MMSS=05
+DDSS=01
+HHSS=00
+#
+# Number of members in an ensemble
+#
+NENS=1 
+#
+# Ensemble initial condition time interval
+#
+INCENS=24
+#
+#  Initial conditions and sst sea_ice and snow
+#
+#  Atmospheric Initial condition
+#
+INITIAL_SIG_PLATFORM=165.132.26.138
+INITIAL_SIG_PROTOCOL=cp
+INITIAL_SIG=/storage1/REAN/r2/6hour/sig_sfc/\$YYYYS/sig.anl.\$YYYYS\$MMS\$DDS\$HHS.ieee
+INITIAL_SFC=/storage1/REAN/r2/6hour/sig_sfc/\$YYYYS/sfc.anl.\$YYYYS\$MMS\$DDS\$HHS.ieee
+INPUT_RESOLUTION=t62k28
+INITIAL_SFC_FILE_TYPE=osu1
+#
+# Ocean Initial condition
+#
+OCN_IN_TEMP=/storage1/CMIP_DATA/ocn/temp.mom.in.\$YYYYS\$MMS\$DDS
+OCN_IN_SALT=/storage1/CMIP_DATA/ocn/salt.mom.in.\$YYYYS\$MMS\$DDS
+OCN_IN_UGRD=/storage1/CMIP_DATA/ocn/ugrd.mom.in.\$YYYYS\$MMS\$DDS
+OCN_IN_VGRD=/storage1/CMIP_DATA/ocn/vgrd.mom.in.\$YYYYS\$MMS\$DDS
+#
+# sst, ice and snow specificatinos
+#
+# sst
+#
+SST_FTP=cp
+SST_PLATFORM=165.132.26.138
+SST_ANL_T0=/storage1/CMIP_DATA/sst/sstgrb.fnl.${YYYYSTART}${MMSS}${DDSS}${HHSS}
+SST_ANL=$EXPDIR/sst/sstgrb.fnl.\$YYYYS\$MMS\$DDS\$HHS
+#
+#  sea ice
+#
+# uncomment the following and modify to use observed or persistent sea ice
+#   ice is climatology in this example
+#
+ICE_PLATFORM=165.132.26.138
+ICE_FTP=ln
+ICE_ANL_T0=
+ICE_ANL=@CON_DIR@/clim.ice.grib
+#
+#  snow
+#
+SNO_PLATFORM=
+SNO_FTP=ln
+SNO_ANL_T0=@CON_DIR@/clim.snow.r2.1979-1998.grib
+SNO_ANL=@CON_DIR@/clim.snow.r2.1979-1998.grib
+SCV_ANL_T0=
+SCV_ANL=
+#
+iicegrb0=1                      # 0 : use guess, 1 : use grib file
+isnogrb0=0
+isstgrb0=1
+ism2grb0=0
+#
+iicegrb=$iicegrb0
+isnogrb=$isnogrb0
+isstgrb=$isstgrb0
+ism2grb=$ism2grb0
+#
+#  output for archive
+#
+ARCHIVE_PLATFORM=`hostname`
+ARCHIVE_FTP_PROTOCOL=cp
+ARCHIVE_DIR=@PWD@/out/$RUNNAME
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+#
+INTSFCX=24
+INTOMLX=24
+INTSIG=6
+INTSFC=6
+INTFLX=6
+INTRESTART=24
+INCHOUR=24
+#
+fgb_post=1
+#
+#
+# Output of monthly averaged file
+#       24 : only daily average
+#       12 : 00 & 12 UTC average
+#       06 : 00, 06, 12, 18 UTC average
+#
+INTAVG=24
+#
+# ---------  Below for expert user only ---------------------
+#
+FCST_RESTART=yes
+#
+#
+EXTVARS=no
+#
+#  choice of arcihve fiels and interval
+#
+#  different archive possible before forecast hour $FHR_1ST_END
+#
+FHR_1ST_END=744
+FTP_SIG_1ST=no
+FTP_SFC_1ST=no
+FTP_ZNL_1ST=no
+FTP_FGB_1ST=no 
+FTP_DIA_1ST=no
+FTP_KEN_1ST=no
+FTP_PGB_1ST=no 
+FTP_SGB_1ST=no
+FTP_FCSTOUT_1ST=no
+FTP_EXTVARS_1ST=no 
+FTP_CGS_1ST=no
+#
+FTP_SIG_2ND=no
+FTP_SFC_2ND=no
+FTP_ZNL_2ND=no
+FTP_FGB_2ND=no
+FTP_DIA_2ND=no
+FTP_KEN_2ND=no
+FTP_PGB_2ND=no
+FTP_SGB_2ND=no
+FTP_FCSTOUT_2ND=no
+FTP_EXTVARS_2ND=no 
+FTP_CGS_2ND=no
+#
+LIST_OF_FILES='sig sfc znl flx fgb dia ken pgb sgb fcstout extvars cgs'
+export LIST_OF_FILES
+#
+#  files to be kept in the run directory
+#
+FILES_TO_BE_KEPT='extvars fcstout'
+#FILES_TO_BE_KEPT='fgb pgb znl dia ken sgb extvars'
+export FILES_TO_BE_KEPT
+#
+#  grib files to be averaged (monthly)
+#
+FILES_TO_BE_AVERAGED='fgb pgb'
+export FILES_TO_BE_AVERAGED
+#
+# -------  do not edit below  ------------------------------
+#
+FCST_NPES=@NPES@
+#
+mkdir -p $EXPDIR 2>/dev/null
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXPDIR/0LOG.$scrnam
+cp @SRCS_DIR@/define.h $EXPDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXPDIR/0LOG.bindates
+#
+#for ocean model
+#
+mkdir -p $EXPDIR/sst
+sstnam=`echo $SST_ANL_T0`
+cp $sstnam $EXPDIR/sst
+#
+# Environmental variables for thread mode
+#
+. @RUNSCR_DIR@/envset
+#
+#if [ $DDSS -gt 15 ] ; then
+#	LENMON=`expr $LENMON + 1`
+#fi
+#
+# save INCHOUR and INTRESTART for modification
+#
+inchour_orig=$INCHOUR
+intrestart_org=$INTRESTART
+#
+#  Loop for year
+#
+YYYYSS=$YYYYSTART
+while [ $YYYYSS -le $YYYYEND ] ; do
+	#
+	# Compute ending year, month, day
+	#
+	YYYYS=$YYYYSS
+	MMS=$MMSS
+	DDS=$DDSS
+	HHS=$HHSS
+#	MME=`expr $MMS + $LENMON`
+	MME=`expr $MMS + $LENMON + 1`
+	if [ $MME -gt 12 ] ; then
+		YYYYE=`expr $YYYYS + 1`
+		MME=`expr $MME - 12`
+	else
+		YYYYE=$YYYYS
+	fi
+	if [ $MME -lt 10 ] ; then
+		MME=0$MME
+	fi
+	DDE=01
+	HHE=00
+	#
+	#  Loop for ensemble member
+	#
+	YYYY=$YYYYS
+	MM=$MMS
+	DD=$DDS
+	HH=$HHS
+	nens=1
+	while [ $nens -le $NENS ] ; do
+		#
+		YMDH=$YYYY$MM$DD$HH
+		#
+		#  obtain forecast hours for various ending dates
+		#
+		. @RUNSCR_DIR@/endfhrs
+		#
+		EXECDIR=$EXPDIR/$YMDH; export EXECDIR
+        mkdir -p $EXECDIR
+        cd $EXECDIR || exit 8
+		#
+		# Forecast section
+		#
+		if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ];then
+			h=`@RUNSCR_DIR@/restart` || exit 8
+		else
+         #
+         # co2
+         #
+         if [ ! -s co2con ] ; then
+            @RUNSCR_DIR@/co2 || exit 8
+         fi
+         #
+         # mtn
+         #
+         if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
+            @RUNSCR_DIR@/mtn || exit 8
+         fi
+			#
+			#  fetch sigma and sfc files
+			#
+			initial_sig=`eval echo $INITIAL_SIG`
+			initial_sfc=`eval echo $INITIAL_SFC`
+			@RUNSCR_DIR@/fetchfile $initial_sig ./initial_sig_glb \
+				$INITIAL_SIG_PROTOCOL $INITIAL_SIG_PLATFORM || exit 8
+			@RUNSCR_DIR@/fetchfile $initial_sfc ./initial_sfc_glb \
+				$INITIAL_SIG_PROTOCOL $INITIAL_SIG_PLATFORM || exit 8
+			#
+			# Conversion to binary
+			#
+			FILE_FORMAT=`echo $INITIAL_SIG | sed 's/.*\.//g'`
+			if [ "$FILE_FORMAT" != ascii -a \
+					"$FILE_FORMAT" != asc -a \
+					"$FILE_FORMAT" != ieee -a \
+					"$FILE_FORMAT" != ieee_dp -a \
+					"$FILE_FORMAT" != ieee_sgi -a \
+					"$FILE_FORMAT" != cray ] ; then
+				FILE_FORMAT=bin
+			fi
+			@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
+				@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
+				$YYYY:-1:01:00:0 \
+				$FILE_FORMAT:bin initial_sig_glb:initial_sfc_glb \
+				initial_sig_bin:initial_sfc_bin || exit 8
+			#
+			# Change resolution
+			#
+			@RUNSCR_DIR@/chgr \
+					initial_sig_bin initial_sfc_bin \
+					sigit sfci \
+					$INITIAL_SFC_FILE_TYPE || exit 8
+					cp sigit sigitdt
+					cp sigit sig.ft00
+					cp sfci sfc.ft00
+			#
+			#  Delete used sigma files
+			#
+			rc=0
+			for filex in $FILES_TO_BE_KEPT
+			do
+				if [ $filex = sig ] ; then
+					rc=1
+				fi
+			done
+#yhb			if [ $rc -eq 0 ] ; then
+#yhb				@RUNSCR_DIR@/delfile sig 00 00 $INTSFCX || exit 8
+#yhb			fi
+			#
+			h=00
+		fi
+		#
+		#  loop
+		#
+		xc=0
+		while [ $h -lt $ENDHOUR ] ; do
+			#
+			INCHOUR=$inchour_orig
+			INTRESTART=$intrestart_org
+			#
+			# modify INCHOUR so that 00Z is output time
+			#
+			if [ $h = 00 -a $HHS != 00 ] ; then
+				hhs=`expr $HHS + 0`
+				INCHOUR=`expr 24 - $hhs`
+			fi
+			hx=`expr $h + $INCHOUR`
+			#
+			# modify INCHOUR so that the forecast end at the end of year
+			# this is necessary for matching sst.grib file
+			#
+			if [ $YEAREND -gt $h -a $YEAREND -le $hx ] ; then
+				INCHOUR=`expr $YEAREND - $h`
+			fi
+			hx=`expr $h + $INCHOUR`
+			if [ $hx -gt $ENDHOUR ] ; then
+				hx=$ENDHOUR
+				INCHOUR=`expr $hx - $h`
+			fi
+			if [ $INTRESTART -gt $INCHOUR ]; then
+				INTRESTART=$INCHOUR
+			fi
+			if [ $hx -lt 10 ];then hx=0$hx;fi
+			echo "`date` $0: fcst from $h to $hx started" >>ERROR.out
+			#
+			# obtain sst, ice and snow for the current verifying year
+			#
+			@ETC_DIR@/incdte $YYYY $MM $DD $HH $h >incdte.$$ || exit 8
+			read YYYYC dummy dummy dummy <incdte.$$ ; rm incdte.$$
+			mkdir -p $EXPDIR/$YYYYC  2>/dev/null
+			#  
+			for fld in sno scv ice
+			do
+				FLD=`echo $fld | tr '[a-z]' '[A-Z]'`
+				anl_t0=\$${FLD}_ANL_T0
+				anl_t0=`eval echo $anl_t0`
+				anl_t0=`eval echo $anl_t0`
+				anl=\$${FLD}_ANL
+				anl=`eval echo $anl`
+				anl=`eval echo $anl`
+				ftp=\$${FLD}_FTP
+				ftp=`eval echo $ftp`
+				platform=\$${FLD}_PLATFORM
+				platform=`eval echo $platform`
+				if [ $h -eq 0 ] ;then
+					if [ -n "$anl_t0" ] ; then
+						if [ $ftp != ln ] ; then
+							@RUNSCR_DIR@/fetchfile  \
+								$anl $EXPDIR/$YYYYC/$fld.grib \
+								$ftp $platform || exit 8
+								eval ${FLD}_GRB_T0=$EXPDIR/$YYYYC/$fld.grib
+						else
+							eval ${FLD}_GRB_T0=$anl_t0
+						fi
+					else
+						eval ${FLD}_GRB_T0=
+					fi
+				fi
+				if [ -n "$anl" ] ; then
+					if [ $ftp != ln ] ; then
+						@RUNSCR_DIR@/fetchfile  \
+							$anl $EXPDIR/$YYYYC/$fld.grib \
+							$ftp $platform || exit 8
+							eval ${FLD}_GRB=$EXPDIR/$YYYYC/$fld.grib
+					else
+						eval ${FLD}_GRB=$anl
+					fi
+				else
+					eval ${FLD}_GRB=
+				fi
+			done
+# for sst
+                YMDH=$YYYY$MM$DD$HH
+                eval cpldate=`@ETC_DIR@/validate.s $YMDH $h`  ;# date of current coupling episode
+                cp $EXPDIR/sst/sstgrb.fnl.$cpldate $EXPDIR/$YYYYC/sst.grib
+                eval SST_GRB_T0=$SST_ANL_T0
+                eval SST_GRB=$EXPDIR/$YYYYC/sst.grib
+#
+			#
+			# run sfc0
+			#
+			if [ $h -eq 0 ] ;then
+				export SST_GRB_T0 SNO_GRB_T0 ICE_GRB_T0
+        		export iicegrb0 isstgrb0 isnogrb0 ism2grb0
+				@RUNSCR_DIR@/sfc0 gsm sfci sfco $INITIAL_SFC_FILE_TYPE || exit 8
+				mv sfco sfci
+			fi
+			#
+			# define ftp output choices (function of $hx)
+			#
+			if [ $hx -le $FHR_1ST_END ] ; then
+				FTP_SIG=$FTP_SIG_1ST
+				FTP_SFC=$FTP_SFC_1ST
+				FTP_ZNL=$FTP_ZNL_1ST
+				FTP_FGB=$FTP_FGB_1ST
+				FTP_DIA=$FTP_DIA_1ST
+				FTP_KEN=$FTP_KEN_1ST
+				FTP_PGB=$FTP_PGB_1ST
+				FTP_SGB=$FTP_SGB_1ST
+				FTP_FCSTOUT=$FTP_FCSTOUT_1ST
+				FTP_EXTVARS=$FTP_EXTVARS_1ST
+				FTP_CGS=$FTP_CGS_1ST
+			else
+				FTP_SIG=$FTP_SIG_2ND
+				FTP_SFC=$FTP_SFC_2ND
+				FTP_ZNL=$FTP_ZNL_2ND
+				FTP_FGB=$FTP_FGB_2ND
+				FTP_DIA=$FTP_DIA_2ND
+				FTP_KEN=$FTP_KEN_2ND
+				FTP_PGB=$FTP_PGB_2ND
+				FTP_SGB=$FTP_SGB_2ND
+				FTP_FCSTOUT=$FTP_FCSTOUT_2ND
+				FTP_EXTVARS=$FTP_EXTVARS_2ND
+				FTP_CGS=$FTP_CGS_2ND
+			fi
+			export FTP_SIG FTP_SFC FTP_ZNL FTP_FGB FTP_DIA FTP_KEN FTP_PGB FTP_SGB \
+					FTP_FCSTOUT FTP_EXTVARS FTP_CGS
+			#
+			#  create fcst.parm
+			#
+			export SST_GRB SNO_GRB ICE_GRB
+        	export iicegrb isstgrb isnogrb ism2grb
+			@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+	 		#
+            #  Execute forecast
+            #
+    if [ "$BATCHQUE" = qsub ]; then
+        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+        log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
+    elif [ "$BATCHQUE" = llsubmit ]; then
+        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+        log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
+    elif [ "$BATCHQUE" = bsub ]; then
+        fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+        fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
+        log_name="fcst.e`echo $fcstid`"
+    fi
+			#
+			   date4restart=`@ETC_DIR@/validate.s $YMDH $hx`
+                        #
+                        #  post processing of the forecasts (pgb and average)
+                        #
+                        archive_dir=`eval echo $ARCHIVE_DIR`
+                        archive_dir=$archive_dir/$YMDH
+                        export YYYY MM DD HH h hx INTSFCX INTOMLX INTSFC ENDHOUR INCHOUR INTFLX INTSIG INTAVG archive_dir ARCHIVE_PLATFORM ARCHIVE_FTP_PROTOCOL LIST_OF_FILES FILES_TO_BE_KEPT FILES_TO BE AVERAGED
+                        if [ "$BATCHQUE" != "" ]; then
+                                if [ "$BATCHQUE" = llsubmit ]; then
+                                        @RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+                                        postid=`${BATCHQUE} @RUNSCR_DIR@/post_all`
+                                        plog_name=post_all.e`echo $postid |cut -d'.' -f1`
+                                else
+                                        postid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/post_all`
+                                        plog_name=post_all.e`echo $postid |cut -d'.' -f1`
+                                        @RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+                                fi
+                                @RUNSCR_DIR@/wait_sigit_update $hx  || exit 8
+                        else
+                                @RUNSCR_DIR@/post_all $YYYY $MM $DD $HH $h $hx $INTSFCX $INTSFC        \
+                                                                $ENDHOUR $INCHOUR $INTFLX $INTSIG $INTAVG $archive_dir \
+                                                                $ARCHIVE_PLATFORM $ARCHIVE_FTP_PROTOCOL  || exit 8
+                        fi
+
+
+#### 
+# here - exe - fcst_ocean
+#----
+
+if [ "$BATCHQUE" = qsub ]; then
+                        archive_dir=`eval echo $ARCHIVE_DIR`
+                        archive_dir=$archive_dir/$YMDH
+      export EXPDIR date4restart YMDH h hx YYYY YYYYS MMS DDS OCN_IN_TEMP OCN_IN_SALT OCN_IN_UGRD OCN_IN_VGRD
+
+      oceanid=`${BATCHQUE} ${BATCHdepend}${postid} @RUNSCR_DIR@/fcst_omp`
+      log_name_omp=fcst_omp.e`echo $oceanid | cut -d'.' -f1`
+            @RUNSCR_DIR@/wait_que_job $postid $plog_name $BATCHstatus || exit 8
+else
+      @RUNSCR_DIR@/fcst_omp 
+fi
+
+if [ "$BATCHQUE" = qsub ]; then
+                        archive_dir=`eval echo $ARCHIVE_DIR`
+                        archive_dir=$archive_dir/$YMDH
+      export  EXPDIR YMDH h hx YYYY YYYYS MMS DDS
+      opostid=`${BATCHQUE} ${BATCHdepend}${oceanid} @RUNSCR_DIR@/post_omp`
+      log_name_opost=post_omp.e`echo $opostid | cut -d'.' -f1`
+            @RUNSCR_DIR@/wait_que_job $oceanid $log_name_omp $BATCHstatus || exit 8
+else
+      @RUNSCR_DIR@/post_omp 
+fi
+
+	 	  	h=$hx
+		done
+		#
+		nens=`expr $nens + 1`
+		@ETC_DIR@/incdte $YYYY $MM $DD $HH $INCENS >incdte.out$$ || exit 8
+		read YYYY MM DD HH <incdte.out$$
+		rm incdte.out$$
+		YYYYS=$YYYY
+		MMS=$MM
+		DDS=$DD
+		HHS=$HH
+	done
+	YYYYSS=`expr $YYYYSS + 1`
+done
+wait
+rm -f *.parm *.x cpost* *.ft00 ftp* model_* *.ieee
+echo "`date` $0: ended"

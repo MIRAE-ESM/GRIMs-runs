@@ -1,0 +1,240 @@
+#!/bin/sh
+set -ax
+#
+# this script makes 72 hour integration starting from an example initial
+# condition. ideal for first testing the system on new computer system
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+testcase=51       # 11,12,13,410,42
+#
+RUNNAME=dcmip$testcase
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+SDATE=2000010100        # Starting forecast date
+if [ $testcase -eq 11 ] ; then
+	ENDHOUR=`expr 24 \* 12`
+	INTSIG=24
+elif [ $testcase -eq 12 ]; then
+	ENDHOUR=`expr 24 \* 1`
+	INTSIG=1
+elif [ $testcase -eq 13 ]; then
+	ENDHOUR=`expr 24 \* 12`
+	INTSIG=24
+elif [ $testcase -eq 200 ]; then
+	ENDHOUR=`expr 24 \* 6`
+	INTSIG=6
+elif [ $testcase -eq 410 ]; then
+	ENDHOUR=`expr 24 \* 15`
+	INTSIG=24
+elif [ $testcase -eq 42 ]; then
+	ENDHOUR=`expr 24 \* 15`
+	INTSIG=24
+elif [ $testcase -eq 51 ]; then
+	ENDHOUR=`expr 24 \* 10`
+	INTSIG=6
+fi
+INCHOUR=$ENDHOUR        # Forecast hour per one execution
+INTSFCX=$ENDHOUR        # Time interval to run surface merging
+INTOMLX=$ENDHOUR        # Time interval to run ocean mixed layer model
+INTRESTART=$ENDHOUR     # Time interval to restart the model
+INTSFC=$INTSIG          # Time interval to create surface output file
+INTFLX=$INTSIG          # Time interval to create surface flux output file
+SWHR_GBL=0              # Time interval of shortwave radiation flux (default=6)
+LWHR_GBL=0              # Time interval of longwave  radiation flux
+#
+FCST_RESTART=no         # Option indicating whether current forecast is first
+DEL_FLUX=no             # Option deleting flux file after forecst (yes;no)
+SIG_GRIB=yes            # Option gribing at sigma layer after forecst (yes;no)
+#
+# ------------- below for expert user only -------------------------------------
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+SYEAR=`echo $SDATE|cut -c1-4`
+SYYYYMMDD=`echo $SDATE|cut -c1-8`
+if [ -z $RUNNAME ]; then
+	EXECDIR=@OUTPUT_DIR@/$SYYYYMMDD
+else 
+	EXECDIR=@OUTPUT_DIR@/$RUNNAME
+fi
+export EXECDIR
+#
+# -------------  do not change below  ------------------------------------------
+#
+mkdir -p $EXECDIR 2>/dev/null
+#
+INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
+#
+FCST_NPES=@NPES@
+FCST_NCPUS=@NCPUS@
+#
+# set environmental variables
+#
+. @RUNSCR_DIR@/envset
+#
+# cd to run directory
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+cd $EXECDIR || exit 8
+cat > dcmip.parm << EOF
+&dcmiplist
+icase=$testcase,
+/
+EOF
+#
+# renew log file
+#
+cat @PWD@/$0 > ERROR.out
+echo '==============' >>ERROR.out
+#
+#  forecast hour loop
+#
+h=0
+while [ $h -lt $ENDHOUR ] ; do
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -gt $ENDHOUR ] ; then
+		hx=$ENDHOUR
+	fi
+	if [ $hx -lt 10 ];then hx=0$hx;fi
+    @RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+                        $INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+	#
+	# Execute forecast
+	#
+	if [ "$BATCHQUE" = qsub ]; then
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
+	elif [ "$BATCHQUE" = llsubmit ]; then
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
+	elif [ "$BATCHQUE" = bsub ]; then
+		fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
+		log_name="fcst.e`echo $fcstid`"
+	else
+		fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	fi
+	#
+	# Postprocess (pgb, fgb)
+	#
+	if [ @DOPOST@ = yes ] ; then
+		phs=0
+		phe=$hx
+		phinc=$INTSIG
+		fhs=0
+		fhe=$hx
+		fhinc=$INTSIG
+        export phs phe phinc fhs fhe phinc
+		if [ "$BATCHQUE" != "" ]; then
+			if [ "$BATCHQUE" = llsubmit ]; then
+				@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+				fcstid=""
+			fi
+			if [ "$BATCHQUE" = bsub ]; then
+				pgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
+                          < @RUNSCR_DIR@/pgb @BATCHsuffix@`
+				if [ "$SIG_GRIB" = yes ]; then
+					sgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
+                              < @RUNSCR_DIR@/sgb @BATCHsuffix@`
+				fi
+				pgbid="`echo $pgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
+				sgbid="`echo $sgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
+			else
+                pgbid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/pgb @BATCHsuffix@`
+				if [ "$SIG_GRIB" = yes ]; then
+					sgbid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/sgb @BATCHsuffix@`
+				fi
+			fi
+		else
+			@RUNSCR_DIR@/pgb $phs $phe $phinc  || exit 8
+			if [ "$SIG_GRIB" = yes ]; then
+			@RUNSCR_DIR@/sgb $fhs $fhe $fhinc  || exit 8
+			fi
+		fi
+		#
+		# Wait queue job for pgb
+		#
+		if [ "$BATCHQUE" != "" ]; then
+			@RUNSCR_DIR@/wait_que_job $sgbid $log_name $BATCHstatus || exit 8
+		fi
+		#
+		# Make control file
+		#
+		# pgb.ctl
+		@ETC_DIR@/grmap pgb.ft%f2
+		# sgb.ctl
+		@ETC_DIR@/grmap sgb.ft%f2
+		if [ $testcase -eq 11 -o $testcase -eq 12 ]; then
+			zrev="zrev"
+		else
+			zrev=""
+		fi
+		# dcmip.ctl
+        sed -e "/dset/ c dset ^./dcmip.bin"                             \
+            -e "/dtype/d"                                               \
+            -e "/options/ c options sequential byteswapped yrev $zrev"  \
+            -e "/index/d"                                               \
+            -e "/title/ c title dcmip"                                  \
+            -e "/vars/,/endvars/d"                                      \
+            sgb.ctl > temp.ctl
+        lvs=`sed -n "s/zdef \(.\+\) levels/\1/p" temp.ctl`
+        sed -e "$ a vars 16"                                            \
+            -e "$ a u    ${lvs} 0 u-wind"                               \
+            -e "$ a v    ${lvs} 0 v-wind"                               \
+            -e "$ a w    ${lvs} 0 w-wind"                               \
+            -e "$ a t    ${lvs} 0 temperature"                          \
+            -e "$ a q    ${lvs} 0 specific humidity"                    \
+            -e "$ a q1   ${lvs} 0 tracer1"                              \
+            -e "$ a q2   ${lvs} 0 tracer2"                              \
+            -e "$ a q3   ${lvs} 0 tracer3"                              \
+            -e "$ a q4   ${lvs} 0 tracer4"                              \
+            -e "$ a rho  ${lvs} 0 density"                              \
+            -e "$ a p    ${lvs} 0 pressure (Pa)"                        \
+            -e "$ a z    ${lvs} 0 height (m)"                           \
+            -e "$ a lon   0 0 longitude"                                \
+            -e "$ a lat   0 0 latitude"                                 \
+            -e "$ a phis  0 0 surface geopotential"                     \
+            -e "$ a ps    0 0 surface pressure (Pa)"                    \
+            -e "$ a endvars"                                            \
+            temp.ctl > dcmip.ctl
+		# nislq.ctl
+        sed -e "/dset/ c dset ^./nislq.bin"                             \
+            -e "/dtype/d"                                               \
+            -e "/options/ c options sequential byteswapped yrev $zrev"  \
+            -e "/index/d"                                               \
+            -e "/title/ c title dcmip"                                  \
+            -e "/vars/,/endvars/d"                                      \
+            sgb.ctl > temp.ctl
+        lvs=`sed -n "s/zdef \(.\+\) levels/\1/p" temp.ctl`
+        sed -e "$ a vars 7"                                             \
+            -e "$ a q0   ${lvs} 0 spfh"                                 \
+            -e "$ a o3   ${lvs} 0 o3"                                   \
+            -e "$ a tke  ${lvs} 0 tke"                                  \
+            -e "$ a q1   ${lvs} 0 tracer1"                              \
+            -e "$ a q2   ${lvs} 0 tracer2"                              \
+            -e "$ a q3   ${lvs} 0 tracer3"                              \
+            -e "$ a q4   ${lvs} 0 tracer4"                              \
+            -e "$ a endvars"                                            \
+            temp.ctl > nislq.ctl
+	fi
+	#
+	h=$hx
+done
+#
+wait
+echo "`date` $0: Completely ended"
+#
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+	lamclean
+	lamhalt
+fi
