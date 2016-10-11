@@ -39,11 +39,11 @@ POST_LAYER=17    # define number of pressure output file
 #
 #  Need to select rmp map projection data.. see ../rmp_domain for more options
 #
-RMP_MAP=./rmp_domain/rmp_108x85_60km_nps.korea
+RMP_MAP=./rmp_domain/rmp_125x145_10km_mer.korea
 #
-if [ $model = rmp -o $model = rop ]; then
-	IGRD=108      # rmp grid selection (IGRD/JGRD)
-	JGRD=85       # igrd: product of integer powers 2,3,5; jgrd: odd number 
+if [ $model = rmp -o $model = rop -o $model = rcm ]; then
+	IGRD=125      # rmp grid selection (IGRD/JGRD)
+	JGRD=145      # igrd: product of integer powers 2,3,5; jgrd: odd number 
 	              # = 54/55, 81/67, 81/87, 108/69, 108/85, 128/85, 162/105
 	CIGRD=0       # define number of coarse regional x-axis grids (only for C2R)
 	CJGRD=0       # define number of coarse regional y-axis grids (only for C2R)
@@ -236,7 +236,7 @@ ncpus=$NCPUS
 jcap=$WAVE
 levs=$MODEL_LAYER
 echo jcap=$jcap,levs=$levs
-if [ $model = rmp -o $model = rop ] ;then
+if [ $model = rmp -o $model = rop -o $model = rcm ] ;then
 	if [ $1 = rmp_ideal ]; then
 		CIGRD=`expr $IGRD \* 2`
 		CJGRD=`expr $JGRD \* 2`
@@ -355,7 +355,7 @@ if [ -n "$script" ] ; then
             exit 8
         fi
     fi
-    if [ $model = rmp -o $model = rop ] ; then
+    if [ $model = rmp -o $model = rop -o $model = rcm ] ; then
         if [ ! -s $RMP_MAP ] ; then
 		    echo "cannot find the $RMP_MAP file "
 		    echo "make it and do configure again "
@@ -452,7 +452,7 @@ fi
 #  Define DELTAT
 #
 DELTAT=""
-if [ $model = rmp -o $model = rop ]; then
+if [ $model = rmp -o $model = rop -o $model = rcm ]; then
   grdsiz=`echo $delx | cut -d'.' -f1`
   if [ $grdsiz -ge 60000 ]; then
     DELTAT=240
@@ -735,9 +735,9 @@ fi
 #
    $RUNSCR_DIR/namelist
 #
-if [ $model = chm ]; then
+if [ $model = chm -o $model = rcm ]; then
 #
-# input.geos for chm
+# input.geos for chm and rcm
 #
    cp $RUNSCR_DIR/input.geos $RUNS_DIR
 fi
