@@ -1,16 +1,16 @@
 GEOS-CHEM SIMULATION v9-01-02: GEOS-5 NOx-Ox-HC-Aerosol simulation (43 tracers)
 ------------------------+------------------------------------------------------
 %%% SIMULATION MENU %%% :
-Root data directory     : @CON_DIR@/../con_chm
-Use LINOZ strat chem?   : F
-Aerosol direct effect   :---
- => Fixed AOD           : F
- => Instantaneous AOD   : T
+Root data directory     : /home/sul/GRIMs/data
+Use LINOZ strat chem?   : T
+Aerosol direct effect   : T
 Aerosol indirect effect : F
+Save met-fields?        : F
+Save nested met-fields? : F
 ------------------------+------------------------------------------------------
 %%% TRACER MENU %%%     :
 Type of simulation      : 10
-Number of Tracers       : 20
+Number of Tracers       : 21
 Tracer Entries -------> : TR#   Name  g/mole   Tracer Members; () = emitted
 Tracer #1               :   1   SO2     64.0
 Tracer #2               :   2   SO4     96.0
@@ -32,6 +32,10 @@ Tracer #17              :  17   DST3    29.0
 Tracer #18              :  18   DST4    29.0
 Tracer #19              :  19   SALA    36.0
 Tracer #20              :  20   SALC    36.0
+Tracer #21              :  21   Ox      48.0
+------------------------+------------------------------------------------------
+%%% TRANSPORT MENU %%%  :
+Turn on Transport       : T
 ------------------------+------------------------------------------------------
 %%% CONVECTION MENU %%% :
 Turn on Cloud Conv?     : T
@@ -129,36 +133,45 @@ tracerinfo.dat path     : tracerinfo.dat
 ------------------------+------------------------------------------------------
 %%% DIAGNOSTIC MENU %%% :
 Diagnostic Entries ---> :  L   Tracers to print out for each diagnostic
-ND05: Sulfate prod/loss : 28   all
+ND05: Sulfate prod/loss : 64   all
 ND06: Dust aer source   :  1   all
-ND07: Carbon aer source : 28   all
+ND07: Carbon aer source : 64   all
 ND08: Seasalt aer source:  1   all
-ND13: Sulfur sources    : 28   all
-ND14: Cld conv mass flx : 27   all
-ND15: BL mix mass flx   : 28   all
-ND16: LS/Conv prec frac : 28   all
-ND17: Rainout fraction  : 28   all
-ND18: Washout fraction  : 28   all
+ND13: Sulfur sources    : 64   all
+ND14: Cld conv mass flx :  0   all
+ND15: BL mix mass flx   :  0   all
+ND16: LS/Conv prec frac :  0   all
+ND17: Rainout fraction  :  0   all
+ND18: Washout fraction  :  0   all
 ND28: Biomass emissions :  1   all
 ND30: Land Map          :  1   all
-ND31: Surface pressure  : 29   all
-ND37: Updraft scav frac : 28   all
-ND38: Cld Conv scav loss: 28   all
-ND39: Wetdep scav loss  : 28   all
+ND31: Surface pressure  :  1   all
+ND37: Updraft scav frac :  0   all
+ND38: Cld Conv scav loss: 64   all
+ND39: Wetdep scav loss  : 64   all
 ND41: Afternoon PBL ht  :  0   all
 ND44: Drydep flx/vel    :  1   all
-ND45: Tracer Conc's     : 28   all
+ND45: Tracer Conc's     : 64   all
   ==> ND45 Time range   :       0 24
 ND47: 24-h avg trc conc :  0   all
 ND54: Time in t'sphere  :  0   all
 ND55: Tropopause height :  1   all
 ND57: Potential T       :  0   all
 ND62: Inst column maps  :  0   all
-ND66: DAO 3-D fields    : 28   all
+ND66: DAO 3-D fields    : 64   all
 ND67: DAO 2-D fields    :  1   all
-ND68: Airmass/Boxheight : 28   all
+ND68: Airmass/Boxheight : 64   all
 ND69: Surface area      :  1   all
 ND70: Debug output      :  0   all
+------------------------+------------------------------------------------------
+%%% ND49 MENU %%%       :
+Turn on ND49 diagnostic : F
+Inst 3-D timeser. file  : tsYYYYMMDD.bpch
+Tracers to include      : 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 31 32 33 34
+Frequency [min]         : 60
+IMIN, IMAX of region    :   1 192
+JMIN, JMAX of region    :   1  94
+LMIN, LMAX of region    :   1  64
 ------------------------+------------------------------------------------------
 %%% UNIX CMDS MENU %%%  :
 Background symbol       : &

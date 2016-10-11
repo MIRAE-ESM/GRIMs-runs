@@ -46,8 +46,8 @@ INITIAL_SFC_FILE_TYPE=osu1
 #
 SST_PLATFORM=
 SST_FTP=ln
-SST_ANL_T0=/home/sul/DATA/SST/gisst22.\$YYYYS.daily
-SST_ANL=/home/sul/DATA/SST/gisst22.\$YYYYS.daily
+SST_ANL_T0=/home/sul/DATA/SST/GISST/gisst22.\$YYYYS.daily
+SST_ANL=/home/sul/DATA/SST/GISST/gisst22.\$YYYYS.daily
 #
 #  sea ice
 #
@@ -90,6 +90,8 @@ INTSFCX=24
 INTSIG=24
 INTSFC=24
 INTFLX=24
+SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
+LWHR_GBL=1              # Time interval of longwave  radiation flux
 INTRESTART=8784
 INCHOUR=8784
 #
@@ -286,7 +288,6 @@ while [ $YYYYS -le $YYYYEND ] ; do
 					cp $EXECDIR/initial_sfc_bin $EXECDIR/sfci
 				fi
 				cp $EXPDIR/$YYYYM/chemi $EXECDIR
-				cp $EXPDIR/$YYYYM/chemidt $EXECDIR
 				cp $EXPDIR/$YYYYM/bxhght $EXECDIR
 			fi
 		else
@@ -449,6 +450,7 @@ while [ $YYYYS -le $YYYYEND ] ; do
 		#
 		export SST_GRB SNO_GRB ICE_GRB
 		export iicegrb isstgrb isnogrb ism2grb
+		export SWHR_GBL LWHR_GBL
 		@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX \
 			$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
 		#

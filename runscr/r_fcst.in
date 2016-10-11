@@ -5,7 +5,7 @@ set -ax
 if [ @SYSTEM@ = linux_pgi ]; then
 export NO_STOP_MESSAGE=1
 fi
-export MPIEXEC_TIMEOUT=15   # to prevent qdel error
+#export MPIEXEC_TIMEOUT=15   # to prevent qdel error
 #
 if [ "$EXECDIR" != "" ]; then
     cd $EXECDIR

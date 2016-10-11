@@ -30,8 +30,8 @@ model=`grep '^MODEL=' $SRCS_DIR/configure-src | \
 #
 WAVE=62          # define wave number = 62,126,170,214,254,320,426,510,1020,2046
 MODEL_LAYER=28   # define number of vertical layer = 18, 28, 42, 64, 128
-POST_IGRD=360    # define number of x-axis grids of pressure output file
-POST_JGRD=181    # define number of y-axis grids of pressure output file
+POST_IGRD=144    # define number of x-axis grids of pressure output file
+POST_JGRD=73     # define number of y-axis grids of pressure output file
                  # POST_IGRD = 144(2.5deg), 360(1deg), 720(0.5deg), 1440(0.25deg)
                  # POST_JGRD =  73(2.5deg), 181(1deg), 361(0.5deg),  721(0.25deg)
 POST_LAYER=17    # define number of pressure output file 
@@ -77,9 +77,9 @@ fi
 #                         more than 2*NPES/JCAP.
 #
 NCPUS=1                 # number of threads (when MARCH = thread or hybrid)
-NPES=32                 # number of MPI pes (when MARCH = mpi    or hybrid)
-NCPU_PER_NODE=16        # number of total cores per node
-NCOL=2                  # number of column (when MARCH=mpi or hybrid)
+NPES=224                # number of MPI pes (when MARCH = mpi    or hybrid)
+NCPU_PER_NODE=28        # number of total cores per node
+NCOL=8                  # number of column (when MARCH=mpi or hybrid)
 #
 if [ $model = rop ]; then
 	RMP_NPES=12

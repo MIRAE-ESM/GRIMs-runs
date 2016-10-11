@@ -60,8 +60,8 @@ BASE_RESOLUTION=t@JCAP@k@LEVS@
 #
 SST_PLATFORM=
 SST_FTP=cp
-SST_ANL_T0=/home/sul/DATA/SST/gisst22.\$YYYYF.daily
-SST_ANL=/home/sul/DATA/SST/gisst22.\$YYYYS.daily
+SST_ANL_T0=/home/sul/DATA/SST/GISST/gisst22.\$YYYYF.daily
+SST_ANL=/home/sul/DATA/SST/GISST/gisst22.\$YYYYS.daily
 #
 # - sea ice
 #
@@ -106,7 +106,7 @@ INTSIG=24
 INTSFC=24
 INTFLX=24
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=3              # Time interval of longwave  radiation flux
+LWHR_GBL=1              # Time interval of longwave  radiation flux
 INTRESTART=8784
 INCHOUR=8784
 NESTING_HOUR=6
@@ -305,7 +305,6 @@ while [ $YYYYS -le $YYYYEND ] ; do
             		cp $EXECDIR/initial_sig_bin $EXECDIR/sigitdt
             		cp $EXECDIR/initial_sfc_bin $EXECDIR/sfci
 			cp $EXPDIR/$YYYYM/chemi $EXECDIR
-			cp $EXPDIR/$YYYYM/chemidt $EXECDIR
 			cp $EXPDIR/$YYYYM/bxhght $EXECDIR
               fi
 	   else

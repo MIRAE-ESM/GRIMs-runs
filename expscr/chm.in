@@ -27,7 +27,7 @@ INTSFC=24               # Time interval to create surface output file
 INTFLX=24               # Time interval to create surface flux output file
 INTRESTART=$ENDHOUR     # Time interval to restart the model
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=3              # Time interval of longwave  radiation flux
+LWHR_GBL=1              # Time interval of longwave  radiation flux
 #
 FCST_RESTART=yes        # Option indicating whether current forecast is first
 DEL_FLUX=yes            # Option deleting flux file after forecst (yes;no)
@@ -60,7 +60,7 @@ INITIAL_SFC_FILE_TYPE=osu1
 #
 # blank means use guess (in the sfc file).
 #
-SST_ANL_T0=$SSTDIR/gisst22.$SYEAR.daily
+SST_ANL_T0=$SSTDIR/GISST/gisst22.$SYEAR.daily
 ICE_ANL_T0=@CON_DIR@/clim.ice.r2.1979-1998.grib
 SNO_ANL_T0=@CON_DIR@/clim.snow.r2.1979-1998.grib
 SCV_ANL_T0=
