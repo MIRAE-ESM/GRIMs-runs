@@ -305,7 +305,9 @@ while [ $YYYYS -le $YYYYEND ] ; do
             		cp $EXECDIR/initial_sig_bin $EXECDIR/sigitdt
             		cp $EXECDIR/initial_sfc_bin $EXECDIR/sfci
 			cp $EXPDIR/$YYYYM/chemi $EXECDIR
-			cp $EXPDIR/$YYYYM/bxhght $EXECDIR
+			cp $EXPDIR/$YYYYM/bxhghti $EXECDIR
+			cp $EXPDIR/$YYYYM/megani $EXECDIR
+			cp $EXPDIR/$YYYYM/cspeci $EXECDIR
               fi
 	   else
 		@RUNSCR_DIR@/fetchfile $initial_sig ./initial_sig_glb \
