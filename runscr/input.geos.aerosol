@@ -1,8 +1,9 @@
-GEOS-CHEM SIMULATION v9-01-02: GEOS-5 NOx-Ox-HC-Aerosol simulation (43 tracers)
+GEOS-CHEM SIMULATION v9-01-02: GEOS-5 Offline aerosol simulation (21 tracers)
 ------------------------+------------------------------------------------------
 %%% SIMULATION MENU %%% :
 Root data directory     : /home/sul/GRIMs/data
 Use LINOZ strat chem?   : T
+Use O3 for radiation?   : T
 Aerosol direct effect   : T
 Aerosol indirect effect : F
 Save met-fields?        : F
@@ -111,6 +112,7 @@ Turn on Wet Deposition? : T
 ------------------------+------------------------------------------------------
 %%% CHEMISTRY MENU %%%  :
 Turn on Chemistry?      : T
+USE solver coded by KPP : F
 ------------------------+------------------------------------------------------
 %%% OUTPUT MENU %%%     : 123456789.123456789.123456789.1--1=ZERO+2=BPCH
 Schedule output for JAN : 3000000000000000000000000000000
@@ -147,15 +149,15 @@ ND18: Washout fraction  :  0   all
 ND21: Optical depths    :  0   all
 ND22: J-Values          :  0   all
       => JV time range  :      11 13
-ND28: Biomass emissions :  1   all
+ND28: Biomass emissions :  1   1 4 11 12
 ND29: CO sources        :  0   all
 ND30: Land Map          :  1   all
 ND31: Surface pressure  :  1   all
 ND32: NOx sources       :  0   all
 ND33: Column tracer     :  0   all
-ND34: Biofuel emissions :  1   all
+ND34: Biofuel emissions :  0   all
 ND35: Tracers at 500 mb :  0   all
-ND36: Anthro emissions  :  1   all
+ND36: Anthro emissions  :  0   all
 ND37: Updraft scav frac :  0   all
 ND38: Cld Conv scav loss: 28   all
 ND39: Wetdep scav loss  : 28   all
@@ -163,10 +165,10 @@ ND41: Afternoon PBL ht  :  0   all
 ND43: Chem OH,NO,HO2,NO2:  0   all
   ==> OH/HO2 time range :       0 24
   ==> NO/NO2 time range :      10 14
-ND44: Drydep flx/vel    :  1   all
+ND44: Drydep flx/vel    :  1   1 2 3 4 5 6 7 9 10 11 12 13 14 15 16 17 18 19 20 21
 ND45: Tracer Conc's     : 28   all
   ==> ND45 Time range   :       0 24
-ND46: Biogenic emissions:  1   all
+ND46: Biogenic emissions:  0   all
 ND47: 24-h avg trc conc :  0   all
 ND52: GAMMA HO2         :  0   all
 ND54: Time in t'sphere  :  0   all
