@@ -100,14 +100,14 @@ Include biomass emiss?  : T
     => synoptic GFED3?  : F
 Individual NOx sources  :---
  => Use aircraft NOx?   : T
- => Use lightning NOx?  : F
+ => Use lightning NOx?  : T
     => Spat-seas constr?: F
  => Use soil NOx        : T
  => Use fertilizer NOx  : T
 NOx scaling             : 1
 Use ship SO2 emissions? :---
- => global EDGAR ?      : T
- => global ICOADS ?     : F
+ => global EDGAR ?      : F
+ => global ICOADS ?     : T
  => EMEP over EUROPE ?  : T
  => ship SO2 Corbett ?  : F
  => ship SO2 Arctas ?   : T
