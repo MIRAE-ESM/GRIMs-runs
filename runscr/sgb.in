@@ -47,6 +47,11 @@ ulimit -c unlimited
 if [ $? -ne 0 ] ; then
 	echo "`date` $0: Execution failed." >>ERROR.out
 	exit 8
+#
+# make ctl
+#
+@RUNSCR_DIR@/makectl sgb
+#
 fi
 rm -f filenv.$$ >/dev/null
 exit 0

@@ -55,6 +55,11 @@ if [ $? -ne 0 ] ; then
 	echo "`date` $0: Execution failed." >>ERROR.out
 	exit 8
 fi
+#
+# make ctl
+#
+@RUNSCR_DIR@/makectl fgb
+#
 rm -f filenv.$$ >/dev/null 
 #
 echo "`date` $0: fgb is completely ended"

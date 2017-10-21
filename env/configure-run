@@ -413,10 +413,14 @@ FTNID=`grep '^FTNID=' $LIBS_DIR/opt_libs/options-$SYSTEM-$march | cut -d'=' -f2`
 FTASS=`grep '^FTASS=' $LIBS_DIR/opt_libs/options-$SYSTEM-$march | cut -d'=' -f2 | sed "s/'//g"`
 RUNENV=`grep '^RUNENV=' $LIBS_DIR/opt_libs/options-$SYSTEM-$march | cut -d'=' -f2 | sed "s/'//g"`
 #
-if [ $nstype -eq 16 -a $nvtype -eq 12 ] ; then
-        VEG_RES=20m
+if [ $nstype -eq 16 -a $nvtype -eq 24 ] ; then
+        VEG_FRAC="clim.vegfrac-nesdis.grib"
+        VEG_VTYP="usgs30s.ieee"
+        VEG_STYP="statsgo30s.ieee"
 else
-        VEG_RES=
+        VEG_FRAC="clim.vegfrac.grib"
+        VEG_VTYP="clim.vegtype.grib"
+        VEG_STYP="clim.soiltype.grib"
 fi
 #
 grep '^sfcftyp=noa1' $CURR_DIR/cvar.env >/dev/null
@@ -602,7 +606,9 @@ s%@NOTIFY_MAIL@%$NOTIFY_MAIL%g
 s%@BARO_TEST@%$BARO_TEST%g
 s%@CLASS@%$CLASS%g
 s%@DELTAT@%$DELTAT%g
-s%@VEG_RES@%$VEG_RES%g
+s%@VEG_FRAC@%$VEG_FRAC%g
+s%@VEG_VTYP@%$VEG_VTYP%g
+s%@VEG_STYP@%$VEG_STYP%g
 s%@NOAH@%$NOAH%g
 s%@FCST_SFC_FILE_TYPE@%$FCST_SFC_FILE_TYPE%g
 s%@GTOPO30@%$GTOPO30%g

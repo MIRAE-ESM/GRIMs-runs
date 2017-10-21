@@ -156,5 +156,6 @@ rm -f runscr/endfhrs
 rm -f runscr/r_post_all
 rm -f runscr/hs-arsc_nec.h
 rm -f runscr/basefnam
+rm -f runscr/makectl
 
 exit 0

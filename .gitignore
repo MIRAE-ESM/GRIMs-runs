@@ -72,6 +72,7 @@ runscr/kiapsrt_mpi.head
 runscr/kiapsrt_single.head
 runscr/lls_mpi.head
 runscr/lls_single.head
+runscr/makectl
 runscr/mean
 runscr/mtn
 runscr/namelist

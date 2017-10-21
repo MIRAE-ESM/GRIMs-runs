@@ -1,0 +1,55 @@
+#!/bin/sh
+#-------------------------------------------------------------------------------
+#
+# Abstract: make control file for GrADs
+#
+# History
+#
+#  2015. 9. 8 - Myung-Seo Koo       Initial version
+#
+#-------------------------------------------------------------------------------
+#
+# object
+#
+obj=$1
+#
+# 3-digit
+#
+obj3=`echo $obj | cut -c1-3`
+ftnum=`ls ${obj}.ft* | wc -l`
+dtnum=`ls ${obj}.1* ${obj}.2* | wc -l`
+if [ $ftnum -ne 0 ]; then
+	f0=
+	@ETC_DIR@/grmap ${obj}.ft%f2
+	sed -e "/dset/cdset ^.\/${obj}.ft%f2" \
+		-e "/index/cindex ^.\/${obj}.idx" \
+		-i ${obj3}.ctl
+elif [ $dtnum -ne 0 ]; then
+	f0='-0'
+	@ETC_DIR@/grmap ${obj}.%y4%m2%d2%h2
+	sed -e "/dset/cdset ^.\/${obj}.%y4%m2%d2%h2" \
+		-e "/index/cindex ^.\/${obj}.idx" \
+		-i ${obj3}.ctl
+fi
+#
+# fgb corr.
+#
+if [ "$obj" == "fgb" ]; then
+	sed -e 's/TMPhag     0 11,105,0/TMPhag     0 11,105,2/g'  \
+		-e 's/SPFH       0 51,105,0/SPFH       0 51,105,2/g'  \
+		-e 's/UGRD       0 33,105,0/UGRD       0 33,105,10/g' \
+		-e 's/VGRD       0 34,105,0/VGRD       0 34,105,10/g' \
+		-e 's/TMAX       0 15,105,0/TMAX       0 15,105,2/g'  \
+		-e 's/TMIN       0 16,105,0/TMIN       0 16,105,2/g'  \
+		-i ${obj3}.ctl
+fi
+#
+# smp corr.
+#
+sed -e 's/-6hr/6hr/g' -e 's/-11hr/1hr/g' -e 's/-9hr/3hr/g' -i ${obj3}.ctl
+#
+# gribmap
+#
+gribmap $f0 -i ${obj3}.ctl
+#
+exit 0

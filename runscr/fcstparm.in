@@ -78,7 +78,7 @@ cat >> $namfile <<EOF
  FNGRB(11)='$SM2_GRB  '
  FNGRB(13)='clim.sibrough.grib   '
  FNGRB(14)='clim.sibresis.grib   '
- FNGRB(18)='clim.vegfrac@VEG_RES@.grib '
+ FNGRB(18)='@VEG_FRAC@           '
 EOF
 #
 if [ `echo ${iicegrb:=0}` -eq 1 ]; then
