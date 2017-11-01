@@ -42,6 +42,7 @@ Use strat O3/NOy BC's   : T
 %%% CONVECTION MENU %%% :
 Turn on Cloud Conv?     : T
 Turn on PBL Mixing?     : T
+ => Use non-local PBL?  : T
 ------------------------+------------------------------------------------------
 %%% EMISSIONS MENU %%%  :
 Turn on emissions?      : T
