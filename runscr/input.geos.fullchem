@@ -214,6 +214,16 @@ Lon_LL, Lon_UR [deg]    : -180 180
 Lat_LL, Lat_UR [deg]    :  -90  90
 LMIN, LMAX of region    :    1  28
 ------------------------+------------------------------------------------------
+%%% PROD & LOSS MENU %%%:
+Turn on P/L (ND65) diag?: F
+# of levels for ND65    : 28
+Save O3 P/L (ND20)?     : F
+Number of P/L families  : 4
+1st chemical family     : POX: O3 NO2 2NO3 PAN PMN PPN HNO4 3N2O5 HNO3
+2nd chemical family     : LOX: O3 NO2 2NO3 PAN PMN PPN HNO4 3N2O5 HNO3
+3rd chemical family     : PCO: CO
+4th chemical family     : LCO: CO
+------------------------+------------------------------------------------------
 %%% UNIX CMDS MENU %%%  :
 Background symbol       : &
 Redirect symbol         :  >
