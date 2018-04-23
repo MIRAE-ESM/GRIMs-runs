@@ -26,9 +26,9 @@ if [ @MARCH@ = thread -o @MARCH@ = hybrid ] ; then
 		MPSTKZ=200M; export MPSTKZ
 		PGI_TERM=trace; export PGI_TERM
     fi
-#    if [ @SYSTEM@ = linux_intel ] ; then
-#		#KMP_STACKSIZE=100M; export KMP_STACKSIZE
-#    fi
+    if [ @SYSTEM@ = linux_intel ] ; then
+		KMP_STACKSIZE=100M; export KMP_STACKSIZE
+    fi
     if [ @SYSTEM@ = x1e ] ; then
 		X1_STACK_SIZE=0x180000000; export X1_STACK_SIZE
 		OMP_THREAD_STACK_SIZE=500000000; export OMP_THREAD_STACK_SIZE
