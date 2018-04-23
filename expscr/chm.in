@@ -22,9 +22,9 @@ ENDHOUR=`expr 24 \* 31` # Length of model integration in hour
 INCHOUR=$ENDHOUR        # Forecast hour per one execution
 INTSFCX=24              # Time interval to run surface merging
 INTOMLX=24              # Time interval to run ocean mixed layer model
-INTSIG=24               # Time interval to create sigma output file
-INTSFC=24               # Time interval to create surface output file
-INTFLX=24               # Time interval to create surface flux output file
+INTSIG=6                # Time interval to create sigma output file
+INTSFC=6                # Time interval to create surface output file
+INTFLX=6                # Time interval to create surface flux output file
 INTRESTART=$ENDHOUR     # Time interval to restart the model
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
 LWHR_GBL=1              # Time interval of longwave  radiation flux

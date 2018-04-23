@@ -76,10 +76,10 @@ fi
 # For DFS, NCOL should be less than MODEL_LAYER,
 #                         more than 2*NPES/JCAP.
 #
-NCPUS=1                 # number of threads (when MARCH = thread or hybrid)
-NPES=224                # number of MPI pes (when MARCH = mpi    or hybrid)
-NCPU_PER_NODE=28        # number of total cores per node
-NCOL=8                  # number of column (when MARCH=mpi or hybrid)
+NCPUS=6                 # number of threads (when MARCH = thread or hybrid)
+NPES=96                 # number of MPI pes (when MARCH = mpi    or hybrid)
+NCPU_PER_NODE=36        # number of total cores per node
+NCOL=12                 # number of column (when MARCH=mpi or hybrid)
 #
 if [ $model = rop ]; then
 	RMP_NPES=12

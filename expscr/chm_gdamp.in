@@ -102,9 +102,9 @@ ARCHIVE_DIR=@OUTPUT_DIR@/$RUNNAME/out
 #
 INTSFCX=24
 INTOMLX=24              # Time interval to run ocean mixed layer model
-INTSIG=24
-INTSFC=24
-INTFLX=24
+INTSIG=6
+INTSFC=6
+INTFLX=6
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
 LWHR_GBL=1              # Time interval of longwave  radiation flux
 INTRESTART=8784

@@ -87,9 +87,9 @@ ARCHIVE_DIR=$EXPDIR/out
 # Intervals of sfc execution, sigma output, sfc output and fgb output
 #
 INTSFCX=24
-INTSIG=24
-INTSFC=24
-INTFLX=24
+INTSIG=6
+INTSFC=6
+INTFLX=6
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
 LWHR_GBL=1              # Time interval of longwave  radiation flux
 INTRESTART=8784
