@@ -89,7 +89,9 @@ fi
 #
 rm -f $PROG.x
 ln -s @BIN_DIR@/${PROG}.x $PROG.x
+unset OMP_NUM_THREADS
 @RUNENV@ ./$PROG.x <$PROG.parm 1>$PROG.out 2>&1
+export OMP_NUM_THREADS=@NTHREADS@
 if [ $? -ne 0 ] ; then
 	echo "`date` $0: execution failed." >>ERROR.out
   exit 8

@@ -161,7 +161,9 @@ fi
 @FTASS@ ${PROG}.parm                    @FTNID@95
 @FTASS@ @RUNS_DIR@/namelist.@SCRIPT@    @FTNID@1
 #
+unset OMP_NUM_THREADS
 @RUNENV@ ./$PROG.x 1>$PROG.out 2>&1
+export OMP_NUM_THREADS=@NTHREADS@
 if [ $? -ne 0 ] ; then
 	echo "`date` $0: Execution failed." >>ERROR.out
 	exit 8
