@@ -123,7 +123,7 @@ elif [ @INSTITUTION@ = kesti -a @SYSTEM2@ = linux ] ; then
    BATCHtype='pbs'
    BATCHstatus='qstat'
 elif [ @INSTITUTION@ = snu -a @SYSTEM2@ = linux ] ; then
-   FCSTENV='mpirun -machinefile $PBS_NODEFILE -np @FCST_NPES@'
+   FCSTENV='mpirun -hostfile $PBS_NODEFILE -ppn @NPES_PER_NODE@ -np @FCST_NPES@'
    BATCHQUE='qsub'
    BATCHdepend='-W depend=afterok:'
    BATCHtype='pbs'
