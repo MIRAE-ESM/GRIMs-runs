@@ -32,9 +32,11 @@ INTOMLX=24              # Time interval to run ocean mixed layer model
 INTSIG=${int_sig}       # Time interval to create sigma output file
 INTSFC=$INTSIG          # Time interval to create surface output file
 INTFLX=$INTSFC          # Time interval to create surface flux output file
+INTNCO=$INTSIG          # Time interavl to create nc output file
 INTSIG2=${int_sig2}     # Time interval to create sigma output file after first execution
 INTSFC2=$INTSIG2        # Time interval to create surface output file after first execution
 INTFLX2=$INTSFC2        # Time interval to create surface flux output file after first execution
+INTNCO2=$INTSIG2        # Time interavl to create nc output file
 INTRESTART=$ENDHOUR     # Time interval to restart the model
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
 LWHR_GBL=3              # Time interval of longwave  radiation flux
@@ -91,10 +93,6 @@ INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
 FCST_NPES=@NPES@
 FCST_NCPUS=@NCPUS@
 #
-# set environmental variables
-#
-. @RUNSCR_DIR@/envset
-#
 # cd to run directory
 #
 scrnam=`echo $0 | sed 's?.*/??g'`
@@ -118,11 +116,6 @@ if [ @BARO_TEST@ != 1 ]; then
 		h=`@ETC_DIR@/fhour sigit`
 		echo "...already completed (fhour in the sigit file = $h)"
 	else
-		#
-		# co2
-		#
-		echo;echo "...processing co2";echo
-		@RUNSCR_DIR@/co2 || exit 8
 		#
 		# mountain
 		#
@@ -231,6 +224,7 @@ while [ $h -lt $ENDHOUR ] ; do
             INTSIG=$INTSIG2
             INTSFC=$INTSFC2
             INTFLX=$INTFLX2
+            INTNCO=$INTNCO2
         fi
     fi
 	if [ $hx -lt 10 ];then hx=0$hx;fi
@@ -243,13 +237,13 @@ while [ $h -lt $ENDHOUR ] ; do
 	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
 	export SWHR_GBL LWHR_GBL
 	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+						$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	#
 	# Execute forecast
 	#
 	echo ; echo "   fcst" ; echo ${bar}
-	if [ "$BATCHQUE" = qsub ]; then
-		fcstid=`$BATCHQUE -N grims_rt_fcst -o $EXECDIR/grims_rt_fcst.out @RUNSCR_DIR@/fcst @BATCHsuffix@ || exit 8`
+	if [ "@BATCHQUE@" = qsub ]; then
+		fcstid=`@BATCHQUE@ -N grims_rt_fcst -o $EXECDIR/grims_rt_fcst.out @RUNSCR_DIR@/fcst @BATCHsuffix@ || exit 8`
 		log_name="grims_rt_fcst.e$fcstid"
 		echo "      queue   = `qstat | grep ${fcstid} | awk '{print $6}'`"
 		echo "      fcst id = ${fcstid}"
@@ -267,7 +261,7 @@ while [ $h -lt $ENDHOUR ] ; do
 		fi
 		pehour=$hx
 		@RUNSCR_DIR@/grims_rt_post $pshour $pehour $INTSIG $fcstid  \
-					$log_name $BATCHQUE $BATCHstatus || exit 8
+					$log_name @BATCHQUE@ @BATCHstatus@ || exit 8
 	fi
 	#
 	# find archive files
@@ -275,7 +269,7 @@ while [ $h -lt $ENDHOUR ] ; do
 	echo; echo "...archiving re-start files (sigit sigitdt sfci)";echo
  	#cp sig.ft$hx sigit     || exit 8
  	#mv sigp.ft$hx sigitdt  || exit 8
- 	cp sfc.ft$hx sfci      || exit 8
+ 	#cp sfc.ft$hx sfci      || exit 8
 	#
 	h=$hx
 done

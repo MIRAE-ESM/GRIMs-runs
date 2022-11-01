@@ -14,21 +14,24 @@ RUNNAME=@RUNNAME@       # Experimental name
 # Intervals of sfc execution, sigma output, sfc output and flx output
 # Various options for running the model
 #
-SDATE=2011072512        # Starting forecast date
-ENDHOUR=`expr 24 \* 10`  # Length of model integration in hour
+SDATE=${SDATE:=2011072512}  # Starting forecast date
+ENDHOUR=`expr 24 \* 10` # Length of model integration in hour
 INCHOUR=$ENDHOUR        # Forecast hour per one execution
 INTSFCX=10000000        # Time interval to run surface merging
 INTOMLX=24              # Time interval to run ocean mixed layer model
 INTSIG=6                # Time interval to create sigma output file
 INTSFC=6                # Time interval to create surface output file
 INTFLX=6                # Time interval to create surface flux output file
+INTNCO=6                # Time interval to create surface flux output file
 INTRESTART=$ENDHOUR     # Time interval to restart the model
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=3              # Time interval of longwave  radiation flux
+LWHR_GBL=1              # Time interval of longwave  radiation flux
 #
 FCST_RESTART=yes        # Option indicating whether current forecast is first
 DEL_FLUX=yes            # Option deleting flux file after forecst (yes;no)
 SIG_GRIB=no             # Option gribing at sigma layer after forecst (yes;no)
+POST_SFC=no             # Option post-processing for surface (yes;no or resol.)
+DEL_BINARY=no           # Option deleting binary output after POST_SFC (yes;no)
 #
 # ------------- below for expert user only -------------------------------------
 #
@@ -45,33 +48,51 @@ if [ -z $RUNNAME ]; then
 else 
 	EXECDIR=@OUTPUT_DIR@/$RUNNAME
 fi
-export EXECDIR
+export EXECDIR SDATE
 #
 # -------------  do not change below  ------------------------------------------
 #
 mkdir -p $EXECDIR 2>/dev/null
 #
-INITIAL_SIGMA=/data/DATABASE/ANALYSIS/GFS/gfs_pgb/${SYEAR}/${SMON}/sig.anl.${SDATE}.ieee
-INITIAL_SFC=/data/DATABASE/ANALYSIS/GFS/gfs_pgb/${SYEAR}/${SMON}/sfc.anl.${SDATE}.ieee
+GFS_DIR=/data/DATABASE/ANALYSIS/GFS/gfs_pgb/${SYEAR}/${SMON}
+SFC_DIR=/data/DATABASE/ANALYSIS/GFS/gfs_sig/${SYEAR}/${SMON}/gfs.${SDATE}
+#
+INITIAL_SIG=${GFS_DIR}/sig.anl.${SDATE}.ieee
+INITIAL_SFC=${GFS_DIR}/sfc.anl.${SDATE}.ieee
+if [ ${SDATE} -ge 2017071912 ]; then
+    INITIAL_SFC=${INITIAL_SFC}.nemsio
+fi
 INITIAL_SFC_FILE_TYPE=noa1
 #
 # blank means use guess (in the sfc file).
 #
-SFCDIR=/data/DATABASE/ANALYSIS/GFS/gfs_sig/${SYEAR}/${SMON}/gfs.${SDATE}        # Directory for sst, sno, ice data
-SST_ANL_T0=${SFCDIR}/gdas1.t${SHOUR}z.sstgrb.grib2
-ICE_ANL_T0=${SFCDIR}/gdas1.t${SHOUR}z.engicegrb.grib2
-SNO_ANL_T0=${SFCDIR}/gdas1.t${SHOUR}z.snogrb.grib2
-SCV_ANL_T0=
-#
-iicegrb0=1              # 0 : use guess, 1 : use grib file
-isnogrb0=1
-isstgrb0=1
-ism2grb0=0
-#
-SST_ANL=${EXECDIR}/cnvrt_initial_sst
-ICE_ANL=${EXECDIR}/cnvrt_initial_ice
-SNO_ANL=${EXECDIR}/cnvrt_initial_sno
-SCV_ANL=
+if [ ${SYEAR} -ge 2015 ] ; then
+	SST_ANL_T0=${SFC_DIR}/rtgssthr_grb_0.5.grib2
+	ICE_ANL_T0=${SFC_DIR}/seaice.t00z.grb.grib2
+	SNO_ANL_T0=
+	SCV_ANL_T0=
+	iicegrb0=1              # 0 : use guess, 1 : use grib file
+	isnogrb0=0
+	isstgrb0=1
+	ism2grb0=0
+	SST_ANL=${EXECDIR}/cnvrt_initial_sst
+	ICE_ANL=${EXECDIR}/cnvrt_initial_ice
+	SNO_ANL=
+	SCV_ANL=
+else
+	SST_ANL_T0=${SFC_DIR}/gdas1.t${SHOUR}z.sstgrb.grib2
+	ICE_ANL_T0=${SFC_DIR}/gdas1.t${SHOUR}z.engicegrb.grib2
+	SNO_ANL_T0=${SFC_DIR}/gdas1.t${SHOUR}z.snogrb.grib2
+	SCV_ANL_T0=
+	iicegrb0=1              # 0 : use guess, 1 : use grib file
+	isnogrb0=1
+	isstgrb0=1
+	ism2grb0=0
+	SST_ANL=${EXECDIR}/cnvrt_initial_sst
+	ICE_ANL=${EXECDIR}/cnvrt_initial_ice
+	SNO_ANL=${EXECDIR}/cnvrt_initial_sno
+	SCV_ANL=
+fi
 #
 iicegrb=$iicegrb0
 isnogrb=$isnogrb0
@@ -84,10 +105,6 @@ FCST_NPES=@NPES@
 FCST_NCPUS=@NCPUS@
 #
 CPSCLD=`grep 'EXPLICIT_CLOUDINESS' @SRCS_DIR@/define.h | awk '{print $1}' | sed 's/\#//g'`
-#
-# set environmental variables
-#
-. @RUNSCR_DIR@/envset
 #
 # cd to run directory
 #
@@ -113,12 +130,6 @@ if [ @BARO_TEST@ != 1 ]; then
 		echo fhour in the sigit file = $h
 	else
 		#
-		# co2
-		#
-		if [ ! -s co2con ] ; then
-			@RUNSCR_DIR@/co2 || exit 8
-		fi
-		#
 		# mountain
 		#
 		if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
@@ -131,11 +142,11 @@ if [ @BARO_TEST@ != 1 ]; then
 		#
 		# Conversion from ascii to native format
 		#
-		fmt=`echo $INITIAL_SIGMA | sed 's/.*\.//g'`
+		fmt=`echo $INITIAL_SIG | sed 's/.*\.//g'`
 		@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
 			@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
 			-1:-1:-1:-1:-1 \
-			$fmt:bin $INITIAL_SIGMA:$INITIAL_SFC \
+			$fmt:bin $INITIAL_SIG:$INITIAL_SFC \
 			cnvrt_initial_sig:cnvrt_initial_sfc || exit 8
                 #
                 # Format conversion from grib2 to grib1
@@ -185,14 +196,6 @@ if [ @BARO_TEST@ != 1 ]; then
 		@ETC_DIR@/date sigit >date.$$ || exit 8
 		read HH MM DD yyyy FH <date.$$ ; rm date.$$
 		echo $yyyy $MM $DD $HH $FH
-		#
-		#  pgb of the initial
-		#
-		if [ @DOPOST@ = yes ] ; then
-			@RUNSCR_DIR@/pgb $h $h $INTSIG || exit 8
-		elif [ @CATPGB@ = yes ] ; then
-			@ETC_DIR@/catpgb
-		fi
 	fi
 else
 	h=0
@@ -216,90 +219,71 @@ while [ $h -lt $ENDHOUR ] ; do
 	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
 	export SWHR_GBL LWHR_GBL
 	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+						$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	#
 	# Execute forecast
 	#
-	if [ "$BATCHQUE" = qsub ]; then
-		fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
-		log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
-	elif [ "$BATCHQUE" = llsubmit ]; then
-		fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	if [ "@BATCHQUE@" = qsub ]; then
+#		fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
+#		log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
+		@BATCHQUE@ -W block=true @RUNSCR_DIR@/fcst || exit 8
+	elif [ "@BATCHQUE@" = llsubmit ]; then
+		fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
 		log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
-	elif [ "$BATCHQUE" = bsub ]; then
-		fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	elif [ "@BATCHQUE@" = bsub ]; then
+		fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/fcst @BATCHsuffix@`
 		fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
 		log_name="fcst.e`echo $fcstid`"
 	else
-		fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
 	fi
 	#
 	# Postprocess (pgb, fgb)
 	#
 	if [ @BARO_TEST@ != 1 ]; then
 		if [ @DOPOST@ = yes ] ; then
-			phs=0
+			phs=$h
 			phe=$hx
 			phinc=$INTSIG
-			fhs=0
+			fhs=$h
 			fhe=$hx
 			fhinc=$INTFLX
-			export phs phe phinc fhs fhe fhinc
-			if [ "$BATCHQUE" != "" ]; then
-				if [ "$BATCHQUE" = llsubmit ]; then
-					@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+			if [ $h -gt 0 ]; then
+				phs=`expr $h + $INTSIG`
+				fhs=`expr $h + $INTFLX`
+			fi
+			export phs phe phinc fhs fhe fhinc SIG_GRIB POST_SFC DEL_BINARY
+			if [ "@BATCHQUE@" != "" ]; then
+				if [ "@BATCHQUE@" = llsubmit ]; then
+					@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 					fcstid=""
 				fi
-				if [ "$BATCHQUE" = bsub ]; then
-					pgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
-                           < @RUNSCR_DIR@/pgb @BATCHsuffix@`
-					fgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
-                           < @RUNSCR_DIR@/fgb @BATCHsuffix@`
-					if [ "$SIG_GRIB" = yes ]; then
-						sgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
-                               < @RUNSCR_DIR@/sgb @BATCHsuffix@`
-					fi
-					pgbid="`echo $pgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
-					fgbid="`echo $fgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
-					sgbid="`echo $sgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
+				if [ "@BATCHQUE@" = bsub ]; then
+					postid=`@BATCHQUE@ @BATCHdepend@ "done(${fcstid})" \
+                           < @RUNSCR_DIR@/post_gmp @BATCHsuffix@`
+					postid="`echo $postid  | cut -d'<' -f2 | cut -d'>' -f1`"
 				else
-	                pgbid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/pgb @BATCHsuffix@`
-					fgbid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/fgb @BATCHsuffix@`
-					if [ "$SIG_GRIB" = yes ]; then
-						sgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
-                              < @RUNSCR_DIR@/sgb @BATCHsuffix@`
-					fi
+#					postid=`@BATCHQUE@ @BATCHdepend@${fcstid} @RUNSCR_DIR@/post_gmp @BATCHsuffix@`
+	                @BATCHQUE@ -W block=true @RUNSCR_DIR@/post_gmp || exit 8
 				fi
 			else
-				@RUNSCR_DIR@/pgb $phs $phe $phinc  || exit 8
-				@RUNSCR_DIR@/fgb $fhs $fhe $fhinc  || exit 8
-				if [ "$SIG_GRIB" = yes ]; then
-				@RUNSCR_DIR@/sgb $fhs $fhe $fhinc  || exit 8
-				fi
+				@RUNSCR_DIR@/post_gmp $phs $phe $phinc || exit 8
 			fi
 			#
-			# Wait queue job for fgb and delete flux file
+			# Wait queue job for post
 			#
-			if [ "$DEL_FLUX" = yes ]; then
-				if [ "$BATCHQUE" != "" ]; then
-					@RUNSCR_DIR@/wait_que_job $fgbid $log_name $BATCHstatus || exit 8
+#			if [ "@BATCHQUE@" != "" ]; then
+#				@RUNSCR_DIR@/wait_que_job $postid $log_name @BATCHstatus@ || exit 8
+				# delete flux file
+				if [ "$DEL_FLUX" = yes ]; then
+					if [ -s fgb.ft$fhe ]; then
+						@RUNSCR_DIR@/delfile flx 0 $hx $INTFLX || exit 8
+					fi
 				fi
-				if [ -s fgb.ft$fhe ]; then
-					@RUNSCR_DIR@/delfile flx 0 $hx $INTFLX || exit 8
-				fi
-			fi
+#			fi
 			#
-			# Wait queue job for pgb
+			# archive files
 			#
-			if [ "$BATCHQUE" != "" ]; then
-				@RUNSCR_DIR@/wait_que_job $pgbid $log_name $BATCHstatus || exit 8
-			fi
-			#
-			# find archive files
-			#
-			#cp sig.ft$hx sigit || exit 8
-			#mv sigp.ft$hx sigitdt  || exit 8
-			cp sfc.ft$hx sfci || exit 8
 			if [ "$CPSCLD" = "define" ]; then
 				cp cpscld.ft$hx cpscldi || exit 8
 			fi

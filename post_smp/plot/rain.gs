@@ -1,0 +1,254 @@
+*-----------------------------------------------
+* set parameters .....
+*
+  file=flx
+  if (file=pgb); ftype=p; endif;
+  if (file=flx); ftype=f; endif;
+*                                 directory
+*                                 experiments
+  expn=1
+  exp.1=test
+  nexp.1=exp.1 
+*                                 make directory for saving plots
+  gdir='_gt'
+ '!mkdir -p 'gdir''
+*----------------------------------------------------------------------
+* open ctl files
+  n = 1
+  nobs = 0
+  while (n <= expn)
+   fname = '/disk8/kyosun/SCM/skh/20100318/run/arm97_test/subA/fa.ctl'
+  'open 'fname
+   say fname
+   n = n + 1
+   nobs = nobs + 1
+  endwhile
+*
+  ofname = '/disk8/kyosun/SCM/skh/20100318/run/con_scm/TOGA/9211/ftoga.ctl'
+ 'open 'ofname
+  say ofname
+  nobs = nobs + 1
+*
+  tim1='01z20dec1992'
+  tim2='00z26dec1992'
+*----------------------------------------------------------------------
+*
+ 'set display color white'
+ 'run bw_wv.gs' 
+ 'clear'
+*
+ 'set x 1'
+ 'set y 1'
+*
+ 'set dfile 1'
+ 'set time 'tim1' 'tim2
+  n = 1
+  while (n <= expn)
+  'define ppt'n'= prate.'n'*3600'
+  'define cpt'n'= cprat.'n'*3600'
+  'define lpt'n'= ppt'n'-cpt'n
+   n = n + 1
+  endwhile
+*
+ 'set dfile 'nobs
+ 'define rain = prate.'nobs'/24.'
+*--------------------------
+ 'set dfile 1'
+  n = 1
+  while (n <= expn)
+  'define pt'n'= ave(prate.'n',time='tim1',time='tim2')*3600*24'
+  'define ct'n'= ave(cprat.'n',time='tim1',time='tim2')*3600*24'
+  'define lt'n'= pt'n'-ct'n
+   n = n + 1
+  endwhile
+*
+ 'set dfile 'nobs
+ 'define rt = ave(prate.'nobs',time='tim1',time='tim2')'
+*----------------------------------------------------------------------
+*
+ 'set vpage 0.0 11.0 0.0 8.5'
+ 'clear'
+ 'set string 6 r 3 0'
+ 'set strsiz 0.10'
+ 'draw string 10.0 8.3 TOGA_1220_case NML/Yonsei Univ'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.13'
+ 'draw string 1.0 8.4 Rain(mm/hr)'
+ 'enable print 'gdir'/rain.plt'
+*
+*------------------------------------------------
+  limit = '0 3.0'
+  x1 = 0.8
+  y1 = 4.8
+  x2 = x1 + 4.5
+  y2 = y1 + 3.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.08'
+ 'set ylopts 1 2 0.08'
+ 'set clopts 1 2 0.08'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.11'
+ 'draw string 'x1+0.1' 'y2+0.1' (a)Total Rain'
+ 'set grads off'
+*
+  cap = TOGA
+  fp = rain
+  fp=timeplot(fp,cap,x1,y1,x2,y2,0,limit)
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    cap = nexp.fn
+    fp = ppt''fn
+    fp=timeplot(fp,cap,x1,y1,x2,y2,fn,limit)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.09'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.35' 'yy1' Rainfall (mm/hr)'
+*------------------------------------------------
+  x1 = 0.8
+  y1 = 1.0
+  x2 = x1 + 4.5
+  y2 = y1 + 3.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.08'
+ 'set ylopts 1 2 0.08'
+ 'set clopts 1 2 0.08'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.11'
+ 'draw string 'x1+0.1' 'y2+0.1' (b) Convective rain'
+ 'set grads off'
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    cap = nexp.fn
+    fp = cpt''fn
+    fp=timeplot(fp,cap,x1,y1,x2,y2,fn,limit)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.09'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.35' 'yy1' Rainfall (mm/hr)'
+*------------------------------------------------
+  limit2 = '0.0 1.0'
+  x1 = 6.0
+  y1 = 1.0
+  x2 = x1 + 4.5
+  y2 = y1 + 3.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.08'
+ 'set ylopts 1 2 0.08'
+ 'set clopts 1 2 0.08'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.11'
+ 'draw string 'x1+0.1' 'y2+0.1' (c) Large-scale rain'
+ 'set grads off'
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    cap = nexp.fn
+    fp = lpt''fn
+    fp=timeplot(fp,cap,x1,y1,x2,y2,fn,limit2)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.09'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.35' 'yy1' Rainfall (mm/hr)'
+*
+*----------------------------------------------------------------------
+  x1 = 6.0
+  y1 = 4.8
+  x2 = x1 + 4.5
+  y2 = y1 + 3.0
+ 'set parea 'x1' 'x2' 'y1' 'y2
+ 'draw line 'x1' 'y2-0.1' 'x2' 'y2-0.1
+ 'set string 1 l 3 0'
+ 'set strsiz 0.08'
+ 'draw string 'x1+0.8' 'y2' Total(mm/d)'
+ 'draw string 'x1+1.8' 'y2' Conv'
+ 'draw string 'x1+2.8' 'y2' Larg'
+ 'draw string 'x1+3.8' 'y2' T-Corr'
+*
+  fp='rt'
+  cap='TOGA'
+ 'draw string 'x1' 'y2-0.2' 'cap
+ 'set time 'tim1
+  gm = pptn_avg(fp)
+ 'draw string 'x1+0.8' 'y2-0.2' 'gm
+  n = 1
+  while (n <= expn)
+    if (n=1);  fp=pt1;  cp=ct1;  lp=lt1;  fpt=ppt1;  cap=nexp.1; endif;
+    if (n=2);  fp=pt2;  cp=ct2;  lp=lt2;  fpt=ppt2;  cap=nexp.2; endif;
+    if (n=3);  fp=pt3;  cp=ct3;  lp=lt3;  fpt=ppt3;  cap=nexp.3; endif;
+    if (n=4);  fp=pt4;  cp=ct4;  lp=lt4;  fpt=ppt4;  cap=nexp.4; endif;
+    if (n=5);  fp=pt5;  cp=ct5;  lp=lt5;  fpt=ppt5;  cap=nexp.5; endif;
+    if (n=6);  fp=pt6;  cp=ct6;  lp=lt6;  fpt=ppt6;  cap=nexp.6; endif;
+    if (n=7);  fp=pt7;  cp=ct7;  lp=lt7;  fpt=ppt7;  cap=nexp.7; endif;
+    if (n=8);  fp=pt8;  cp=ct8;  lp=lt8;  fpt=ppt8;  cap=nexp.8; endif;
+    if (n=9);  fp=pt9;  cp=ct9;  lp=lt9;  fpt=ppt9;  cap=nexp.9; endif;
+    if (n=10); fp=pt10; cp=ct10; lp=lt10; fpt=ppt10; cap=nexp.10; endif;
+   'set time 'tim1
+   'draw string 'x1' 'y2-0.2-n*0.2' 'cap
+    gm = pptn_avg(fp)
+    totl = gm
+   'draw string 'x1+0.8' 'y2-0.2-n*0.2' 'totl
+    gm = pptn_avg(cp)
+    conv = gm
+   'draw string 'x1+1.8' 'y2-0.2-n*0.2' 'conv
+    gm = pptn_avg(lp)
+    larg = gm
+   'draw string 'x1+2.8' 'y2-0.2-n*0.2' 'larg
+   'set time 'tim1' 'tim2
+    gm = pptn_cor(fpt,rain,tim1,tim2)
+    corr = gm
+   'draw string 'x1+3.8' 'y2-0.2-n*0.2' 'corr
+    n = n + 1
+  endwhile
+*
+ 'print'
+ 'disable print'
+*
+*======================================================================
+  function timeplot(fp,cap,x1,y1,x2,y2,fn,limit)
+*
+  if (fn=0); clno=55; csno=1; cmno=0; cthk=7; endif;
+*  if (fn=1); clno=1;  csno=1; cmno=0; cthk=7; endif;
+  if (fn=1); clno=1;  csno=1; cmno=2; cthk=5; endif;
+  if (fn=2); clno=1;  csno=1; cmno=5; cthk=5; endif;
+  if (fn=4); clno=55; csno=1; cmno=1; cthk=5; endif;
+  xx1 = x2 - 2.0
+  yy1 = y2 - (fn+1)*0.2
+*
+* 'set ylab %.1f'
+ 'set grads off'
+ 'set axlim 'limit
+ 'set gxout line'
+ 'set ccolor 'clno
+ 'set cstyle 'csno
+ 'set cmark 'cmno
+ 'set cthick 'cthk
+ 'd 'fp
+ 'run line_label.gs 'xx1' 'yy1' 'cap' 'clno' 'csno' 'cthk' 'cmno' 0.10'
+*
+  return
+*
+*======================================================================
+  function pptn_cor(fp1,fp2,t1,t2)
+*
+ 'define tc = tcorr('fp1','fp2',time='t1',time='t2')'
+ 'set time 't1
+ 'd tc'
+  gm = subwrd(result,4)
+  return(gm)
+*
+*======================================================================
+  function pptn_avg(fp)
+*
+ 'define fmd = 'fp
+ 'd fmd'
+  gm = subwrd(result,4)
+  return(gm)

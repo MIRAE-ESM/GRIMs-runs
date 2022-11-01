@@ -46,8 +46,8 @@ INITIAL_SFC_FILE_TYPE=osu1
 #
 SST_PLATFORM=
 SST_FTP=ln
-SST_ANL_T0=/home/sul/DATA/SST/GISST/gisst22.\$YYYYS.daily
-SST_ANL=/home/sul/DATA/SST/GISST/gisst22.\$YYYYS.daily
+SST_ANL_T0=/home/sul/DATA/SST/gisst22.\$YYYYS.daily
+SST_ANL=/home/sul/DATA/SST/gisst22.\$YYYYS.daily
 #
 #  sea ice
 #
@@ -87,11 +87,10 @@ ARCHIVE_DIR=$EXPDIR/out
 # Intervals of sfc execution, sigma output, sfc output and fgb output
 #
 INTSFCX=24
-INTSIG=6
-INTSFC=6
-INTFLX=6
-SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=1              # Time interval of longwave  radiation flux
+INTSIG=24
+INTSFC=24
+INTFLX=24
+INTNCO=24               # Time interavl to create nc output file
 INTRESTART=8784
 INCHOUR=8784
 #
@@ -162,10 +161,6 @@ cp $0 $EXPDIR/0LOG.g.$scrnam
 cp @SRCS_DIR@/define.h $EXPDIR/0LOG.g.define.h
 ls -l @BIN_DIR@ >$EXPDIR/0LOG.g.bindates
 #
-# Environmental variables for thread mode
-#
-. @RUNSCR_DIR@/envset
-#
 #if [ $DDSS -gt 15 ] ; then
 #       LENMON=`expr $LENMON + 1`
 #fi
@@ -223,12 +218,6 @@ while [ $YYYYS -le $YYYYEND ] ; do
 	if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ];then
 		h=`@RUNSCR_DIR@/restart` || exit 8
 	else
-		#
-		# co2
-		#
-		if [ ! -s co2con ] ; then
-			@RUNSCR_DIR@/co2 || exit 8
-		fi
 		#
 		# mtn
 		#
@@ -288,8 +277,8 @@ while [ $YYYYS -le $YYYYEND ] ; do
 					cp $EXECDIR/initial_sfc_bin $EXECDIR/sfci
 				fi
 				cp $EXPDIR/$YYYYM/chemi $EXECDIR
-				cp $EXPDIR/$YYYYM/megani $EXECDIR
-				cp $EXPDIR/$YYYYM/cspeci $EXECDIR
+				cp $EXPDIR/$YYYYM/chemidt $EXECDIR
+				cp $EXPDIR/$YYYYM/bxhght $EXECDIR
 			fi
 		else
 			@RUNSCR_DIR@/fetchfile $initial_sig ./initial_sig_glb \
@@ -451,20 +440,19 @@ while [ $YYYYS -le $YYYYEND ] ; do
 		#
 		export SST_GRB SNO_GRB ICE_GRB
 		export iicegrb isstgrb isnogrb ism2grb
-		export SWHR_GBL LWHR_GBL
 		@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX \
-			$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+			$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 		#
 		#  Execute forecast
 		#
-	    if [ "$BATCHQUE" = qsub ]; then
-   	     fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	    if [ "@BATCHQUE@" = qsub ]; then
+   	     fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
    	     log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
-	    elif [ "$BATCHQUE" = llsubmit ]; then
-   	     fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	    elif [ "@BATCHQUE@" = llsubmit ]; then
+   	     fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
    	     log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
-		elif [ "$BATCHQUE" = bsub ]; then
-   	     fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		elif [ "@BATCHQUE@" = bsub ]; then
+   	     fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/fcst @BATCHsuffix@`
    	     fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
    	     log_name="fcst.e`echo $fcstid`"
 		fi
@@ -474,16 +462,16 @@ while [ $YYYYS -le $YYYYEND ] ; do
 		archive_dir=`eval echo $ARCHIVE_DIR`
 		archive_dir=$archive_dir/$YMDH
 		export YYYY MM DD HH h hx INTSFCX INTOMLX INTSFC ENDHOUR INCHOUR INTFLX INTSIG INTAVG archive_dir ARCHIVE_PLATFORM ARCHIVE_FTP_PROTOCOL LIST_OF_FILES FILES_TO_BE_KEPT FILES_TO BE AVERAGED
-		if [ "$BATCHQUE" != "" ]; then
-			if [ "$BATCHQUE" = llsubmit ]; then
-				@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
-				${BATCHQUE} @RUNSCR_DIR@/post_all
-			elif [ "$BATCHQUE" = bsub ]; then
-				${BATCHQUE} ${BATCHdepend} "done(${fcstid})" < @RUNSCR_DIR@/post_all
-				@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+		if [ "@BATCHQUE@" != "" ]; then
+			if [ "@BATCHQUE@" = llsubmit ]; then
+				@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
+				@BATCHQUE@ @RUNSCR_DIR@/post_all
+			elif [ "@BATCHQUE@" = bsub ]; then
+				@BATCHQUE@ @BATCHdepend@ "done(${fcstid})" < @RUNSCR_DIR@/post_all
+				@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 			else
-				${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/post_all
-				@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+				@BATCHQUE@ @BATCHdepend@${fcstid} @RUNSCR_DIR@/post_all
+				@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 			fi
 			@RUNSCR_DIR@/wait_sigit_update $hx  || exit 8
 		else

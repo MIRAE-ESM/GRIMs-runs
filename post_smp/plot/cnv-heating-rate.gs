@@ -1,0 +1,146 @@
+*-----------------------------------------------
+* set parameters .....
+*
+*
+*                                 experiments
+  expn=1
+  exp.1=test
+  nexp.1=exp.1
+*                                 make directory for saving plots
+  gdir='_gt'
+ '!mkdir -p 'gdir''
+*----------------------------------------------------------------------
+* open ctl files
+  n = 1
+  nobs = 0
+  while (n <= expn)
+   fname = '/disk8/kyosun/SCM/skh/20100318/run/arm97_test/subA/cld.ctl'
+  'open 'fname
+   say fname
+   n = n + 1
+   nobs = nobs + 1
+  endwhile
+*
+  tim1='01z20dec1992'
+  tim2='00z26dec1992'
+*----------------------------------------------------------------------
+*
+ 'set display color white'
+ 'run bw_wv.gs' 
+ 'clear'
+*
+ 'set x 1'
+ 'set y 1'
+*
+ 'set z 1 40'
+  n = 1
+  while (n <= expn)
+  'define t = ave(cnvhr.'n',time='tim1',time='tim2')'
+  'define hs'n' = t * 3600* 24 '
+  'define m = ave(cnvmr.'n',time='tim1',time='tim2')'
+  'define ms'n' = m*-2.5e+6*3600*24/1004.6'
+   n = n + 1
+  endwhile
+*
+*----------------------------------------------------------------------
+ 'set vpage 0.0 11.0 0.0 8.5'
+ 'clear'
+ 'set string 6 r 3'
+ 'set strsiz 0.10'
+ 'draw string 10.0 8.3 TOGA_1220_case NML/Yonsei Univ'
+ 'set string 1 l 3'
+ 'set strsiz 0.15'
+ 'draw string 1.0 8.3 convective forcing profile'
+ 'enable print 'gdir'/forcing_by_cnv.plt'
+*
+ 'set t 1'
+  x1 = 1.2
+  y1 = 1.0
+  x2 = x1 + 4.3
+  y2 = y1 + 5.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.13'
+ 'set ylopts 1 2 0.13'
+ 'set clopts 1 2 0.13'
+ 'set ylab %.1f'
+ 'set grads off'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.15'
+ 'draw string 'x1+0.1' 'y2+0.2' (a) Heat source (K/day)'
+  limit1 ='-2 14 2'
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    if (fn=1); fp=hs1; cap=nexp.1; endif;
+    if (fn=2); fp=hs2; cap=nexp.2; endif;
+    if (fn=3); fp=hs3; cap=nexp.3; endif;
+    if (fn=4); fp=hs4; cap=nexp.4; endif;
+    if (fn=5); fp=hs5; cap=nexp.5; endif;
+    fp=vrtplot(fp,cap,x1,y1,x2,y2,fn,limit1,1)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.15'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.90' 'yy1' sigma (p/p_sfc)'
+ 'set vpage off'
+*
+  x1 = 6.5
+  y1 = 1.0
+  x2 = x1 + 4.3
+  y2 = y1 + 5.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.13'
+ 'set ylopts 1 2 0.13'
+ 'set clopts 1 2 0.13'
+ 'set ylab %.1f'
+ 'set grads off'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.15'
+ 'draw string 'x1+0.1' 'y2+0.2' (b) Moisture sink (K/day)'
+  limit2 ='-2 14 2'
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    if (fn=1); fp=ms1; cap=nexp.1; endif;
+    if (fn=2); fp=ms2; cap=nexp.2; endif;
+    if (fn=3); fp=ms3; cap=nexp.3; endif;
+    if (fn=4); fp=ms4; cap=nexp.4; endif;
+    if (fn=5); fp=ms5; cap=nexp.5; endif;
+    fp=vrtplot(fp,cap,x1,y1,x2,y2,fn,limit2,0)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.15'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.90' 'yy1' sigma (p/p_sfc)'
+ 'set vpage off'
+*
+ 'print'
+ 'disable print'
+*
+*----------------------------------------------------------------------
+  function vrtplot(fp,cap,x1,y1,x2,y2,fn,limit,ind)
+*
+  if (fn=1); clno=55; csno=1; cmno=0; cthk=7; endif;
+  if (fn=2); clno=1;  csno=1; cmno=2; cthk=5; endif;
+  if (fn=3); clno=1;  csno=1; cmno=5; cthk=5; endif;
+  if (fn=4); clno=1;  csno=1; cmno=1; cthk=5; endif;
+  if (fn=5); clno=1;  csno=1; cmno=0; cthk=7; endif;
+  xx1 = x2 - 1.7
+  yy1 = y1+1.8 - fn*0.3
+  if (ind=0); yy1 = y2+0.1 - fn*0.3; endif;
+*
+ 'set grads off'
+ 'set axlim 'limit
+ 'set gxout line'
+ 'set ccolor 'clno
+ 'set cstyle 'csno
+ 'set cmark 'cmno
+ 'set cthick 'cthk
+ 'd 'fp
+ 'run line_label.gs 'xx1' 'yy1' 'cap' 'clno' 'csno' 'cthk' 'cmno' 0.13'
+*
+  return

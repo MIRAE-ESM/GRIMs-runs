@@ -1,0 +1,226 @@
+*-----------------------------------------------
+* set parameters .....
+*
+*
+*                                 experiments
+  expn=1
+  exp.1=test
+  nexp.1=exp.1
+*                                 make directory for saving plots
+  gdir='_gt'
+ '!mkdir -p 'gdir''
+*----------------------------------------------------------------------
+* open ctl files
+  n = 1
+  nobs = 0
+  while (n <= expn)
+   fname = '@EXEC_DIR@/cld.ctl'
+  'open 'fname
+   say fname
+   n = n + 1
+   nobs = nobs + 1
+  endwhile
+*
+  tim1='01z20dec1992'
+  tim2='00z26dec1992'
+*----------------------------------------------------------------------
+*
+ 'set display color white'
+ 'run bw_wv.gs' 
+ 'clear'
+*
+ 'set x 1'
+ 'set y 1'
+*
+ 'set z 1 40'
+  n = 1
+  while (n <= expn)
+  'define c = ave(swhr.'n',time='tim1',time='tim2')'
+  'define ch'n' = c * 3600* 24 '
+  'define l = ave(lwhr.'n',time='tim1',time='tim2')'
+  'define lh'n' = l * 3600* 24 '
+  'define th'n' = ch'n' + lh'n
+  'define tc'n' = ave(tcdcsig.'n',time='tim1',time='tim2')'
+   n = n + 1
+  endwhile
+*
+*----------------------------------------------------------------------
+ 'set vpage 0.0 8.5 0.0 11.0'
+ 'set string 6 r 3'
+ 'set strsiz 0.10'
+ 'draw string 8.3 10.9 TOGA_1220_case NML/Yonsei Univ'
+ 'set string 1 l 3'
+ 'set strsiz 0.12'
+ 'draw string 0.3 10.9 Radiative Heating & Cloudiness'
+ 'enable print 'gdir'/rad-cld.plt'
+*
+ 'set time 'tim1
+  x1 = 1.0
+  y1 = 6.0
+  x2 = x1 + 2.5
+  y2 = y1 + 4.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.11'
+ 'set ylopts 1 2 0.11'
+ 'set clopts 1 2 0.11'
+ 'set ylab %.1f'
+ 'set grads off'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.13'
+ 'draw string 'x1' 'y2+0.2' (a) SW (K/day)'
+  limit1 ='-2 8 2'
+  limit1 ='-2 10 2'
+ 'set xlint 2'
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    if (fn=1); fp=ch1; cap=nexp.1; endif;
+    if (fn=2); fp=ch2; cap=nexp.2; endif;
+    if (fn=3); fp=ch3; cap=nexp.3; endif;
+    if (fn=4); fp=ch4; cap=nexp.4; endif;
+    if (fn=5); fp=ch5; cap=nexp.5; endif;
+    fp=vrtplot(fp,cap,x1,y1,x2,y2,fn,limit1,1)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.13'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.80' 'yy1' sigma (p/p_sfc)'
+ 'set vpage off'
+*
+  x1 = 4.5
+  y1 = 6.0
+  x2 = x1 + 2.5
+  y2 = y1 + 4.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.11'
+ 'set ylopts 1 2 0.11'
+ 'set clopts 1 2 0.11'
+ 'set ylab %.1f'
+ 'set grads off'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.13'
+ 'draw string 'x1' 'y2+0.2' (b) LW (K/day)'
+  limit2 ='-6 2 2'
+  limit2 ='-10 4 2'
+ 'set xlint 2'
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    if (fn=1); fp=lh1; cap=nexp.1; endif;
+    if (fn=2); fp=lh2; cap=nexp.2; endif;
+    if (fn=3); fp=lh3; cap=nexp.3; endif;
+    if (fn=4); fp=lh4; cap=nexp.4; endif;
+    if (fn=5); fp=lh5; cap=nexp.5; endif;
+    fp=vrtplot(fp,cap,x1,y1,x2,y2,fn,limit2,0)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.13'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.80' 'yy1' sigma (p/p_sfc)'
+ 'set vpage off'
+*
+  x1 = 1.0
+  y1 = 1.0
+  x2 = x1 + 2.5
+  y2 = y1 + 4.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.11'
+ 'set ylopts 1 2 0.11'
+ 'set clopts 1 2 0.11'
+ 'set ylab %.1f'
+ 'set grads off'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.13'
+ 'draw string 'x1' 'y2+0.2' (c) Total (K/day)'
+  limit3 ='-8 6 2'
+ 'set xlint 2'
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    if (fn=1); fp=th1; cap=nexp.1; endif;
+    if (fn=2); fp=th2; cap=nexp.2; endif;
+    if (fn=3); fp=th3; cap=nexp.3; endif;
+    if (fn=4); fp=th4; cap=nexp.4; endif;
+    if (fn=5); fp=th5; cap=nexp.5; endif;
+    fp=vrtplot(fp,cap,x1,y1,x2,y2,fn,limit3,0)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.13'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.80' 'yy1' sigma (p/p_sfc)'
+ 'set vpage off'
+*
+  x1 = 4.5
+  y1 = 1.0
+  x2 = x1 + 2.5
+  y2 = y1 + 4.0
+ 'set parea 'x1' 'x2' 'y1' 'y2''
+ 'set xlopts 1 2 0.11'
+ 'set ylopts 1 2 0.11'
+ 'set clopts 1 2 0.11'
+ 'set ylab %.1f'
+ 'set grads off'
+ 'set string 1 l 3 0'
+ 'set strsiz 0.13'
+ 'draw string 'x1' 'y2+0.2' (d) Cloudiness (%)'
+*  limit4 ='0 100 20'
+  limit4 ='0  80 20'
+ 'set xlint 20'
+*
+  fn = 1
+  fnum = expn
+  while (fn <= fnum)
+    if (fn=1); fp=tc1; cap=nexp.1; endif;
+    if (fn=2); fp=tc2; cap=nexp.2; endif;
+    if (fn=3); fp=tc3; cap=nexp.3; endif;
+    if (fn=4); fp=tc4; cap=nexp.4; endif;
+    if (fn=5); fp=tc5; cap=nexp.5; endif;
+    fp=vrtplot(fp,cap,x1,y1,x2,y2,fn,limit4,0)
+    fn = fn + 1
+  endwhile
+ 'set string 1 c 3 90'
+ 'set strsiz 0.13'
+  yy1 = (y1+y2)*0.5
+ 'draw string 'x1-0.80' 'yy1' sigma (p/p_sfc)'
+ 'set vpage off'
+*
+ 'print'
+ 'disable print'
+*
+*----------------------------------------------------------------------
+  function vrtplot(fp,cap,x1,y1,x2,y2,fn,limit,ind)
+*
+*  if (fn=1); clno=58; csno=1; cmno=0; cthk=7; endif;
+*  if (fn=2); clno=48;  csno=1; cmno=2; cthk=5; endif;
+*  if (fn=3); clno=38;  csno=1; cmno=1; cthk=5; endif;
+*  if (fn=4); clno=28;  csno=1; cmno=5; cthk=5; endif;
+*  if (fn=5); clno=1;  csno=1; cmno=0; cthk=7; endif;
+  if (fn=1); clno=55; csno=1; cmno=0; cthk=7; endif;
+  if (fn=2); clno=1;  csno=1; cmno=2; cthk=5; endif;
+  if (fn=3); clno=1;  csno=1; cmno=5; cthk=5; endif;
+  if (fn=4); clno=1;  csno=1; cmno=1; cthk=5; endif;
+  if (fn=5); clno=1;  csno=1; cmno=0; cthk=7; endif;
+  xx1 = x2 - 1.5
+  yy1 = y1+1.55- fn*0.3
+  if (ind=0); yy1 = y2+0.1 - fn*0.3; endif;
+  if (ind=2); xx1 = x1+0.1; endif;
+*
+ 'set grads off'
+ 'set axlim 'limit
+ 'set gxout line'
+ 'set ccolor 'clno
+ 'set cstyle 'csno
+ 'set cmark 'cmno
+ 'set cthick 'cthk
+ 'd 'fp
+  if (ind!=0)
+ 'run line_label.gs 'xx1' 'yy1' 'cap' 'clno' 'csno' 'cthk' 'cmno' 0.10'
+  endif
+*
+  return

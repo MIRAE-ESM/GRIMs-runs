@@ -31,7 +31,6 @@ fi
 @FTASS@ r_smooth_oroggd                   @FTNID@14
 @FTASS@ $OUTRSIG                          @FTNID@51
 @FTASS@ $OUTRSFC                          @FTNID@52
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@      @FTNID@1
 #
 if [ @SYSTEM@ = dec ]; then
   ulimit -s 1024000

@@ -6,7 +6,7 @@ EXECDIR=${EXECDIR:=`pwd`}
 npost=1
 while [ $npost -ne 0 ]; do
         sleep 10
-     if [ "@MODEL@" = rmp -o "@MODEL@" = rcm ]; then
+     if [ "@MODEL@" = rmp ]; then
         hxrest=`@ETC_DIR@/fhour ${EXECDIR}/r_sigit`
      else
         hxrest=`@ETC_DIR@/fhour ${EXECDIR}/sigit`
@@ -15,7 +15,7 @@ while [ $npost -ne 0 ]; do
         npost=0
         fi
 done
-if [ "@MODEL@" = rmp -o "@MODEL@" = rcm ]; then
+if [ "@MODEL@" = rmp ]; then
      echo "now r_sigit is updated to " $hx
 else
      echo "now sigit is updated to " $hx

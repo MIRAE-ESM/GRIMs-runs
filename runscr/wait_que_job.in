@@ -15,6 +15,8 @@ while [ $njob -ne 0 ]; do
 	if [ @INSTITUTION@ = nml   -o @INSTITUTION@ = kaf  -o \
 		@INSTITUTION@ = kesti -o @INSTITUTION@ = ncar -o \
 		@INSTITUTION@ = apcc  -o @INSTITUTION@ = snu -o \
+		@INSTITUTION@ = nuri  -o @INSTITUTION@ = miri -o \
+		@INSTITUTION@ = hanul -o \
         @INSTITUTION@ = kiaps -o @INSTITUTION@ = kiapsrt ]; then
 		status=`$BATCHstatus | grep $jobid | awk '{printf $5}'`
 		if [ "$status" = E -o "$status" = C  ]; then
@@ -31,8 +33,9 @@ while [ ! -s $logname ]; do
 done
 last=`tail -1 $logname`
 #
-if [ @INSTITUTION@ = haenam ]; then
-	print 'no checking "exit 0".'
+if [ @INSTITUTION@ = haenam -o @INSTITUTION@ = uri -o \
+	@INSTITUTION@ = nuri -o @INSTITUTION@ = miri ]; then
+	echo 'no checking "exit 0".'
 else
 	if [ `echo $last | grep exit | wc -l` -ne 1 ]; then
 		exit 8

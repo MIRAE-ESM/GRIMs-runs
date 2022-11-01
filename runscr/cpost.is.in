@@ -71,6 +71,7 @@ fi
 while [ -s pgb.ft$fhc -a $fh -le %FHE% ] ; do
    fh=`expr $fh + %INTFLX%`
    fhc=$fh
+   if [ $fhc -lt 10 ] ; then fhc=0$fh ; fi
 done
 fhstart=$fh
 if [ $fhstart -le %FHE% ] ; then
@@ -118,6 +119,7 @@ while [ $hr_stp -le $hr_end ] ; do
       @ETC_DIR@/force_grib_date_mon dia.$fdate $fdate  || exit 8
    fi
    hr_stp=`expr $hr_stp + %INTFLX%`
+   if [ $hr_stp -lt 10 ] ; then  hr_stp=0$hr_stp ; fi
 done
 #
 #  Daily file archive
@@ -226,7 +228,8 @@ done
 #
 # skip first month for averaging
 #
-if [ @SCRIPT@ = gsim ] ; then
+script=@SCRIPT@
+if [ ${script:0:4} = gsim ]; then
   c=1
 else
   c=0
@@ -302,6 +305,17 @@ while [ $c -lt $MCOUNT ] ; do
             @ETC_DIR@/grmean -o $file.$yyyy$mm.h12.avrg.grib $file.$yyyy$mm\%d2\12 || exit 8
             @ETC_DIR@/grmean -o $file.$yyyy$mm.h18.avrg.grib $file.$yyyy$mm\%d2\18 || exit 8
          fi
+         if [ $monavg -eq 3 ]; then
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.avrg.grib $file.$yyyy$mm\%d2%h2 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h00.avrg.grib $file.$yyyy$mm\%d2\00 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h03.avrg.grib $file.$yyyy$mm\%d2\03 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h06.avrg.grib $file.$yyyy$mm\%d2\06 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h09.avrg.grib $file.$yyyy$mm\%d2\09 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h12.avrg.grib $file.$yyyy$mm\%d2\12 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h15.avrg.grib $file.$yyyy$mm\%d2\15 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h18.avrg.grib $file.$yyyy$mm\%d2\18 || exit 8
+            @ETC_DIR@/grmean -o $file.$yyyy$mm.h21.avrg.grib $file.$yyyy$mm\%d2\21 || exit 8
+         fi
          #
          if [ $file = pgb -a %VARIANCE% = yes ] ; then
             @RUNSCR_DIR@/variance $file $fh $fte $intvl \
@@ -339,6 +353,26 @@ while [ $c -lt $MCOUNT ] ; do
                @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h18.avrg.grib \
                   %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
             fi
+            if [ $monavg -eq 3 ]; then
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h00.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h03.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h06.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h09.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h12.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h15.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h18.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.h21.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+            fi
             #
             if [ $file = pgb -a %VARIANCE% = yes ] ; then
                @RUNSCR_DIR@/ftpavrg $file.$yyyy$mm.variance.grib \
@@ -363,6 +397,102 @@ while [ $c -lt $MCOUNT ] ; do
       continue
    fi
 done
+#
+# three month average
+#
+if [ $ENDHOUR -eq %FHE% ] ; then
+   if [ "$MMS" = "05" ]; then MMM=JJA ; fi
+   if [ "$MMS" = "11" ]; then MMM=DJF ; fi
+#
+      for file in $files_to_be_averaged ; do
+
+         # average file for MMS month (05 or 11) are deleted
+         mmsavrgA=`ls $file.????$MMS.avrg.grib 2> /dev/null | wc -l`
+         mmsavrgB=`ls $file.????$MMS.h??.avrg.grib 2> /dev/null | wc -l`
+         mmsavrg=`expr $mmsavrgA + $mmsavrgB`
+         if [ $mmsavrg -gt 0 ]; then
+            rm -f $file.????$MMS.avrg.grib
+            rm -f $file.????$MMS.h??.avrg.grib
+         fi
+
+         if [ $monavg -eq 24 ]; then
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.avrg.grib $file.\%y4%m2.avrg.grib || exit 8
+         fi
+         if [ $monavg -eq 12 ]; then
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.avrg.grib $file.\%y4%m2.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h00.avrg.grib $file.\%y4%m2.h00.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h12.avrg.grib $file.\%y4%m2.h12.avrg.grib || exit 8
+         fi
+         if [ $monavg -eq 6 ]; then
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.avrg.grib $file.\%y4%m2.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h00.avrg.grib $file.\%y4%m2.h00.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h06.avrg.grib $file.\%y4%m2.h06.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h12.avrg.grib $file.\%y4%m2.h12.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h18.avrg.grib $file.\%y4%m2.h18.avrg.grib || exit 8
+         fi
+         if [ $monavg -eq 3 ]; then
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.avrg.grib $file.\%y4%m2.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h00.avrg.grib $file.\%y4%m2.h00.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h03.avrg.grib $file.\%y4%m2.h03.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h06.avrg.grib $file.\%y4%m2.h06.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h09.avrg.grib $file.\%y4%m2.h09.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h12.avrg.grib $file.\%y4%m2.h12.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h15.avrg.grib $file.\%y4%m2.h15.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h18.avrg.grib $file.\%y4%m2.h18.avrg.grib || exit 8
+            @ETC_DIR@/grmean -o $file.$YYYYS$MMM.h21.avrg.grib $file.\%y4%m2.h21.avrg.grib || exit 8
+         fi
+         #
+         #  ftp
+         #
+         if [ -n "%PLATFORM%" ] ; then
+            #
+            if [ $monavg -eq 24 ]; then
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+            fi
+            if [ $monavg -eq 12 ]; then
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h00.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h12.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+            fi
+            if [ $monavg -eq 6 ]; then
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h00.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h06.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h12.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h18.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+            fi
+            if [ $monavg -eq 3 ]; then
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h00.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h03.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h06.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h09.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h12.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h15.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h18.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+               @RUNSCR_DIR@/ftpavrg $file.$YYYYS$MMM.h21.avrg.grib \
+                  %RMAVRG% %FTPDIR% %PLATFORM% %FTP_PROTOCOL%
+            fi
+         fi
+      done
+fi
 #
 #  extvars processing
 #

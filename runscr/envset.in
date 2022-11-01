@@ -26,9 +26,9 @@ if [ @MARCH@ = thread -o @MARCH@ = hybrid ] ; then
 		MPSTKZ=200M; export MPSTKZ
 		PGI_TERM=trace; export PGI_TERM
     fi
-    if [ @SYSTEM@ = linux_intel ] ; then
-		KMP_STACKSIZE=100M; export KMP_STACKSIZE
-    fi
+#    if [ @SYSTEM@ = linux_intel ] ; then
+#		#KMP_STACKSIZE=100M; export KMP_STACKSIZE
+#    fi
     if [ @SYSTEM@ = x1e ] ; then
 		X1_STACK_SIZE=0x180000000; export X1_STACK_SIZE
 		OMP_THREAD_STACK_SIZE=500000000; export OMP_THREAD_STACK_SIZE
@@ -39,13 +39,18 @@ runscr=@RUNSCR_DIR@
 #
 # Environmental variables for mpi mode
 #
-if [ @MARCH@ = mpi -o @MARCH@ = thread -o @MARCH@ = hybrid ]; then
-
 if [ @INSTITUTION@ = nml -a @SYSTEM2@ = linux ] ; then
    FCSTENV='mpirun -machinefile $PBS_NODEFILE -np @FCST_NPES@'
    BATCHQUE='qsub'
    BATCHdepend='-W depend=afterok:'
    BATCHtype='pbs'
+   BATCHstatus='qstat'
+elif [ @INSTITUTION@ = hanul -a @SYSTEM2@ = linux ] ; then
+#  FCSTENV='mpirun -machinefile $PBS_NODEFILE -np @FCST_NPES@'
+   FCSTENV='mpirun -np @FCST_NPES@'
+   BATCHQUE='qsub'
+   BATCHdepend='-W depend=afterok:'
+   BATCHtype='torque'
    BATCHstatus='qstat'
 elif [ @INSTITUTION@ = kisti -a @SYSTEM2@ = linux ]; then
    if [ \( "$MPI" = "" -a "$MPINAME" = "openmpi" \) -o "$MPI" = "openmpi" ]; then
@@ -77,8 +82,26 @@ elif [ @INSTITUTION@ = haenam -a @SYSTEM2@ = linux ]; then
    BATCHdepend='-W depend=afterok:'
    BATCHtype='haenam'
    BATCHstatus='qstat'
+elif [ @INSTITUTION@ = uri -a @SYSTEM2@ = linux ]; then
+   FCSTENV='aprun -n @FCST_NPES@'
+   BATCHQUE='qsub'
+   BATCHdepend='-W depend=afterok:'
+   BATCHtype='uri'
+   BATCHstatus='qstat'
+elif [ @INSTITUTION@ = nuri -a @SYSTEM2@ = linux ]; then
+   FCSTENV='aprun -n @FCST_NPES@'
+   BATCHQUE='qsub'
+   BATCHdepend='-W depend=afterok:'
+   BATCHtype='nuri'
+   BATCHstatus='qstat'
+elif [ @INSTITUTION@ = miri -a @SYSTEM2@ = linux ]; then
+   FCSTENV='aprun -n @FCST_NPES@'
+   BATCHQUE='qsub'
+   BATCHdepend='-W depend=afterok:'
+   BATCHtype='miri'
+   BATCHstatus='qstat'
 elif [ @INSTITUTION@ = kiaps -a @SYSTEM2@ = linux ]; then
-   if [ `echo $MPI_RUN | grep mpich2   | wc -l` -eq 1 ]; then      # gaon1 mpich2
+   if [ `echo $MPI_HOME | grep mpich2   | wc -l` -eq 1 ]; then      # gaon1 mpich2
      FCSTENV='mpirun -np @FCST_NPES@ -f $PBS_NODEFILE'
    else
      FCSTENV='mpirun -machinefile $PBS_NODEFILE -np @FCST_NPES@'
@@ -123,7 +146,7 @@ elif [ @INSTITUTION@ = kesti -a @SYSTEM2@ = linux ] ; then
    BATCHtype='pbs'
    BATCHstatus='qstat'
 elif [ @INSTITUTION@ = snu -a @SYSTEM2@ = linux ] ; then
-   FCSTENV='mpirun -hostfile $PBS_NODEFILE -ppn @NPES_PER_NODE@ -np @FCST_NPES@'
+   FCSTENV='mpirun -machinefile $PBS_NODEFILE -np @FCST_NPES@'
    BATCHQUE='qsub'
    BATCHdepend='-W depend=afterok:'
    BATCHtype='pbs'
@@ -133,11 +156,11 @@ elif [ @INSTITUTION@ = kma -a @SYSTEM@ = x1e ]; then
    BATCHQUE=''
    BATCHdepend=''
    BATCHtype='dec'
-elif [ @SYSTEM@ = mac ]; then
-   FCSTENV='mpirun -wd $here_dir'
+elif [ @SYSTEM@ = mac_gnu ]; then
+   FCSTENV='mpirun -np @NPES@'
    BATCHQUE=''
    BATCHdepend=''
-   BATCHtype='mac'
+   BATCHtype='dec'
 elif [ @SYSTEM@ = dec ]; then
    FCSTENV='dmpirun -np @NPES@'
    BATCHQUE=''
@@ -151,15 +174,13 @@ else
    BATCHdepend=''
    BATCHtype='dec'
 fi
-
-else  # for single run
-   FCSTENV=''
-   BATCHQUE=''
-   BATCHdepend=''
-   BATCHtype='dec'
-fi
-if [ @MARCH@ = thread ]; then
-   FCSTENV=''
+#
+# single or thread
+#
+if [ @MARCH@ = thread -o @MARCH@ = single ]; then
+	FCSTENV=''
+	BATCHQUE=''
+	BATCHdepend=''
 fi
 #
 # Make fcst, pgb, fgb scripts with FCSTENV and header
@@ -184,7 +205,7 @@ fi
    #
    # serial
    #
-   files="pgb fgb sgb post_omp post_all r_post_all grims_rt_post"
+   files="pgb fgb sgb post_gmp post_gmp_sfc post_omp post_all r_post_all grims_rt_post"
    for file in $files; do
      sed -n "s%@FCSTENV@%${FCSTENV}%g ; /end_of_header/,\$p" \
              $runscr/$file > $runscr/$file.a

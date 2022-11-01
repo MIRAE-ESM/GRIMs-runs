@@ -1,0 +1,5 @@
+#!/bin/sh
+#PBS -l nodes=@NNODES@:ppn=@NPES_PER_NODE@:@MPI_QUEUE@
+#PBS -q @MPI_QUEUE@
+#PBS -V
+#PBS -j eo

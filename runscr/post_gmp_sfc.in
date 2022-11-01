@@ -1,0 +1,92 @@
+#!/bin/sh
+set -ax
+#------------------------------------------------------------------end_of_header
+#
+#  abstract: do post process for surface evaluation
+#
+#-------------------------------------------------------------------------------
+#
+phs=${phs:=$1}
+phe=${phe:=$2}
+phinc=${phinc:=$3}
+fhs=${fhs:=$1}
+fhe=${fhe:=$2}
+fhinc=${fhinc:=$3}
+EXECDIR=${EXECDIR:=$4}
+if [ "$EXECDIR" == "" ]; then
+    EXECDIR=`pwd`
+fi
+POSTDIR=$EXECDIR/post_sfc
+#
+# setup
+#
+ulimit -s unlimited
+mkdir -p $POSTDIR ; cd $POSTDIR
+fh=$fhs ; if [ $fh -lt 10 -a "a$fh" != "a00" ]; then fh=0$fh ; fi
+filetime=`wgrib -4yr -s $EXECDIR/fgb.ft$fh 2> /dev/null | tail -1 | cut -d":" -f3 | cut -c3-`
+export initime=${SDATE:=$filetime}
+export endhour=$initime
+export IGRDIN=@LONF@
+export JGRDIN=@LATG@
+export dlon=${POST_SFC:=0.25}
+export dlat=$dlon
+if [ $dlon = 1.0 ]; then
+	export IGRDOUT=360
+	export JGRDOUT=181
+elif [ $dlon = 0.5 ]; then
+	export IGRDOUT=720
+	export JGRDOUT=361
+elif [ $dlon = 0.25 ]; then
+	export IGRDOUT=1440
+	export JGRDOUT=721
+else
+	echo "resolution is set to the default (0.25)."
+	export dlon=0.25
+	export dlat=0.25
+	export IGRDOUT=1440
+	export JGRDOUT=721
+fi
+#
+# fgb
+#
+echo "-> do fgb for surface"
+fh=$fhs
+while [ $fh -le $fhe ]; do
+	if [ $fh -lt 10 -a "a$fh" != "a00" ]; then fh=0$fh ; fi
+	export fhour=$fh
+	@ETC_DIR@/gribinterp $EXECDIR/fgb.ft$fh ./fgb.ft$fh &> /dev/null || exit 8
+	fh=`expr $fh + $fhinc`
+done
+@RUNSCR_DIR@/makectl fgb
+#
+# pgb
+#
+echo "-> do pgb for surface"
+cp @RUNSCR_DIR@/pgb 			.
+cp $NAMELIST namelist.pgbsfc
+sed -i -e "/io_/c  io_    = $IGRDOUT," \
+       -e "/jo_/c  jo_    = $JGRDOUT," \
+		namelist.pgbsfc
+sed -i -e "/namelist.pgbsfc/cln -fs namelist.pgbsfc fort.1" \
+       -e "/EXECDIR=\${EXECDIR/cEXECDIR=\"\"" \
+		pgb
+ph=$phs
+while [ $ph -le $phe ]; do
+	if [ $ph -lt 10 -a "a$ph" != "a00" ]; then ph=0$ph ; fi
+	ln -sf $EXECDIR/sig.ft$ph .
+	ph=`expr $ph + $phinc`
+done
+./pgb $phs $phe $phinc $POSTDIR || exit 8
+#
+# clean
+#
+rm -f interparm fort.51 gribinterp.out grmap.* sig.ft* pgb.x pgb.parm namelist.pgbsfc pgb print.out pgb.out
+if [ "$DEL_BINARY" == "yes" ]; then
+	cd $EXECDIR
+	@RUNSCR_DIR@/delfile sig $phs $phe $phinc
+	@RUNSCR_DIR@/delfile sfc $fhs $fhe $fhinc
+	@RUNSCR_DIR@/delfile rivgb $phs $phe $phinc
+	rm -rf cnvrt_* *.x RRTMG* rivi
+fi
+
+exit 0

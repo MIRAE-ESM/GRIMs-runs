@@ -22,6 +22,7 @@ INTOMLX=24
 INTSIG=12
 INTSFC=12
 INTFLX=12
+INTNCO=12
 #
 SFC_WARM=yes   # use the  guess fields for sfc data
 SFC_WARM_CYCLE=24 # hour 
@@ -82,9 +83,6 @@ INITIAL_SFC_FILE_TYPE=osu1
 # PUT THE INPUT FILES IN NFS DIRECTORY for MPI
 #
 INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
-#
-#
-. @RUNSCR_DIR@/envset
 #
 # If you wish, you may modify EXECDIR to /tmp directory and keep these
 # scripts on your permanent disk.

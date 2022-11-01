@@ -10,133 +10,215 @@ set -ax
 #
 #    Program history :
 #
-#    01-19-2004   Young-Hwa Byun       Initial development
-#    08-19-2008   Kyung-Hee Seol       Nudging options, lsm options
-#    03-19-2010   Song-You Hong        Clean up, grims setup
+#    2015-01-19 young-hwa byun  initial development
+#    2008-08-19 kyung-hee seol  nudging options, lsm options
+#    2010-03-19 song-you hong   clean up, grims setup
+#    2015-09-03 myung-seo koo   dimension allocatable
+#    2019-09-19 myung-seo koo   dynamic run not depending configure-run
 #
 #-----------------------------------------------------------------------------
 #
-RUNNAME=s_000
+# select from arms18/arms38/gate19/toga40/trmm37
+#             usgp37/mana45/mc3e42/peca41/iop142/iop242 for dcp
 #
-# -----------------------------------------------------------------------------
+obs_smp=${scase:="usgp37"}
+levs=64   # 0 for default level if sigma coordinate
 #
-host=`hostname | cut -d . -f1`
-if [ $host = global ];then
-	host_head=''
-else
-	host_head='/global'
+if [ $# -eq 1 ]; then
+	obs_smp=$1
+fi
+if [ "$obs_smp" -ne "arms18" -o "$obs_smp" -ne "arms38" -o \
+	 "$obs_smp" -ne "gate19" -o "$obs_smp" -ne "toga40" -o \
+	 "$obs_smp" -ne "trmm37" -o "$obs_smp" -ne "usgp37" -o \
+	 "$obs_smp" -ne "mana45" -o "$obs_smp" -ne "mc3e42" -o \
+	 "$obs_smp" -ne "peca41" -o "$obs_smp" -ne "iop142" -o \
+	 "$obs_smp" -ne "iop242" ]; then
+	echo "obs_smp should be arms18/arms38/gate19/toga40/trmm37/usgp37/mana45/mc3e42/peca41/iop142/iop242"
+	exit 8
 fi
 #
-smp_lsm=@FCST_SFC_FILE_TYPE@
-obs_smp=@SMP_OBS@
-site=@SITE_NAME@
+# site for ceop64
 #
-if [ $obs_smp = toga40 ]; then
-    obs='toga'
-elif [ $obs_smp = arms18 ]; then
-    obs='arm97'
-elif [ $obs_smp = arms38 ]; then
-    obs='arm00'
-elif [ $obs_smp = ceop64 ]; then
-    obs='ceop64'
-fi
-#
-# set environmental variables
-#
-. @RUNSCR_DIR@/envset
+site='KOREAN'
 #
 # Intervals of sigma output, sfc output and flx output
 #
 INTSFCX=24
 INTOMLX=24
-if [ $obs = arm00 -o $obs = arm97 -o $obs = ceop64 ]; then
-	INTSFC=3
-	INTSIG=3
-	INTFLX=3
+if [ $obs_smp = usgp37 -o $obs_smp = mana45 -o $obs_smp = peca41 -o \
+	$obs_smp = iop142 -o $obs_smp = iop242 -o $obs_smp = mc3e42 ] ; then
+INTSFC=1
+INTSIG=1
+INTFLX=1
+INTNCO=1
 else
-	INTSFC=6
-	INTSIG=6
-	INTFLX=6
+INTSFC=3
+INTSIG=3
+INTFLX=3
+INTNCO=3
 fi
-INTRESTART=24
-SWHR_GBL=$INTFLX
-LWHR_GBL=$INTFLX
+SWHR_GBL=1
+LWHR_GBL=1
 export SWHR_GBL LWHR_GBL
 #
-FCST_RESTART=no
+INITIAL_SFC_DIR=@SMPCON_DIR@/ncep_sfc
 #
-if [ $smp_lsm = osu1 ]; then
-	smp_sfc=no
+if [ $obs_smp = usgp37 ]; then
+	SYEAR=2004 # 2004~2015 (125*15)
+	subs=1; sube=125 
+elif [ $obs_smp = mana45 ]; then
+	SYEAR=2014 # 2014/2015
+	subs=1; sube=361
+elif [ $obs_smp = iop142 -o $obs_smp = iop242 ]; then
+	subs=1; sube=36
+elif [ $obs_smp = mc3e42 ]; then
+	subs=1; sube=42
+elif [ $obs_smp = peca41 ]; then
+	subs=1; sube=41
 else
-	smp_sfc=yes
+	subs=1; sube=1
 fi
-#
-INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
-#
-sub=1
-if [ $obs = arm97 ]; then
-	subc=1
-else
-	subc=1
-fi
-#
-while [ $sub -le $subc ]; do
+sub=$subs
+while [ $sub -le $sube ]; do
 	if [ $sub -eq 1 ]; then
 		exp=A
 	fi
-	if [ $obs = toga ]; then
-		yymm=9211
+	if [ $obs_smp = toga40 ]; then
 		SYYYYMMDDHH=1992122000
 		EYYYYMMDDHH=1992122600
-		gr_stime=00Z20Dec1992
-	elif [ $obs = arm00 ]; then
-		yymm=0003
+	elif [ $obs_smp = trmm37 ]; then
+		SYYYYMMDDHH=1999081000
+		EYYYYMMDDHH=1999082000
+	elif [ $obs_smp = gate19 ]; then
+		SYYYYMMDDHH=1974083000
+		EYYYYMMDDHH=1974091903
+	elif [ $obs_smp = arms38 ]; then
 		SYYYYMMDDHH=2000030118
 		EYYYYMMDDHH=2000032209
-		gr_stime=18Z01Mar2000
-	elif [ $obs = arm97 ]; then
-		yymm=9707
+	elif [ $obs_smp = arms18 ]; then
 		if [ $sub = 1 ]; then
 			SYYYYMMDDHH=1997062700
 			EYYYYMMDDHH=1997071800
-			gr_stime=00Z27Jun1997
 			exp=A
 		elif [ $sub = 2 ]; then
 			SYYYYMMDDHH=1997070800
 			EYYYYMMDDHH=1997071300
-			gr_stime=00Z08Jul1997
 			exp=B
 		elif [ $sub = 3 ]; then
 			SYYYYMMDDHH=1997071300
 			EYYYYMMDDHH=1997071800
-			gr_stime=00Z13Jul1997
 			exp=C
 		fi
-	elif [ $obs = ceop64 ]; then
+	elif [ $obs_smp = usgp37 ]; then
+		sname="sgp"
+		IYYYYMMDDHH=${SYEAR}042800
+		fhour=`echo "($sub-1)%125*24;" | bc`
+		SYYYYMMDDHH=`validate.s $IYYYYMMDDHH $fhour`
+		if [ $sub -gt 125 -a $fhour -eq 0 ]; then
+			SYEAR=`echo $SYYYYMMDDHH | cut -c1-4`	
+			SYEAR=`expr $Y4 + 1`
+			SYYYYMMDDHH=${SYEAR}042800
+		fi
+		if [ $sub -eq $sube ]; then
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 120`
+		else
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 123`
+		fi
+		YEAR=`echo $SYYYYMMDDHH | cut -c 1-4`
+		MM=`echo $SYYYYMMDDHH | cut -c 5-6`
+        INITIAL_SFC_DIR=/home/mskoo/GRIMs/grimsini/ra2/sfc/$YEAR/$MM
+        DCP_DIR='/home/mskoo/project/DCP/original_varanal'
+	elif [ $obs_smp = mana45 ]; then
+		sname="goamazon$SYEAR"
+		IYYYYMMDDHH=${SYEAR}010100
+		fhour=`echo "($sub-1)*24;" | bc`
+		SYYYYMMDDHH=`validate.s $IYYYYMMDDHH $fhour`
+		if [ $sub -eq $sube ]; then
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 120`
+		else
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 123`
+		fi
+		YEAR=`echo $SYYYYMMDDHH | cut -c 1-4`
+		MM=`echo $SYYYYMMDDHH | cut -c 5-6`
+        INITIAL_SFC_DIR=/home/mskoo/GRIMs/grimsini/ra2/sfc/$YEAR/$MM
+        DCP_DIR='/home/mskoo/project/DCP/4.1.2'
+	elif [ $obs_smp = mc3e42 ]; then
+		sname="mc3e"
+#		SYYYYMMDDHH=2011042200
+		IYYYYMMDDHH=2011042200
+		fhour=`echo "scale=5;($sub-1)*24;" | bc`
+		SYYYYMMDDHH=`validate.s $IYYYYMMDDHH $fhour`
+		if [ $sub -eq $sube ]; then
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 120`
+		else
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 123`
+		fi
+		YEAR=`echo $SYYYYMMDDHH | cut -c 1-4`
+		MM=`echo $SYYYYMMDDHH | cut -c 5-6`
+        INITIAL_SFC_DIR=/home/mskoo/GRIMs/grimsini/ra2/sfc/$YEAR/$MM
+		DCP_DIR='/home/mskoo/project/DCP/4.2.1'
+	elif [ $obs_smp = peca41 ]; then
+		sname="pecan"
+#		SYYYYMMDDHH=2015060100
+		IYYYYMMDDHH=2015060100
+		fhour=`echo "scale=5;($sub-1)*24;" | bc`
+		SYYYYMMDDHH=`validate.s $IYYYYMMDDHH $fhour`
+		if [ $sub -eq $sube ]; then
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 120`
+		else
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 123`
+		fi
+		YEAR=`echo $SYYYYMMDDHH | cut -c 1-4`
+		MM=`echo $SYYYYMMDDHH | cut -c 5-6`
+        INITIAL_SFC_DIR=/home/mskoo/GRIMs/grimsini/ra2/sfc/$YEAR/$MM
+		DCP_DIR='/home/mskoo/project/DCP/4.2.1'
+	elif [ $obs_smp = iop142 ]; then
+		sname="goamazonIOP1"
+#		SYYYYMMDDHH=2014021500
+		IYYYYMMDDHH=2014021500
+		fhour=`echo "scale=5;($sub-1)*24;" | bc`
+		SYYYYMMDDHH=`validate.s $IYYYYMMDDHH $fhour`
+		if [ $sub -eq $sube ]; then
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 120`
+		else
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 123`
+		fi
+		YEAR=`echo $SYYYYMMDDHH | cut -c 1-4`
+		MM=`echo $SYYYYMMDDHH | cut -c 5-6`
+        INITIAL_SFC_DIR=/home/mskoo/GRIMs/grimsini/ra2/sfc/$YEAR/$MM
+		DCP_DIR='/home/mskoo/project/DCP/4.2.2/arm-iop/0eval-data/xie/scm-forcing/iop_at_mao/GOAMAZON/IOP1_v1.2'
+	elif [ $obs_smp = iop242 ]; then
+		sname="goamazonIOP2"
+#		SYYYYMMDDHH=2014090100
+		IYYYYMMDDHH=2014090100
+		fhour=`echo "scale=5;($sub-1)*24;" | bc`
+		SYYYYMMDDHH=`validate.s $IYYYYMMDDHH $fhour`
+		if [ $sub -eq $sube ]; then
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 120`
+		else
+			EYYYYMMDDHH=`validate.s $SYYYYMMDDHH 123`
+		fi
+		YEAR=`echo $SYYYYMMDDHH | cut -c 1-4`
+		MM=`echo $SYYYYMMDDHH | cut -c 5-6`
+        INITIAL_SFC_DIR=/home/mskoo/GRIMs/grimsini/ra2/sfc/$YEAR/$MM
+		DCP_DIR='/home/mskoo/project/DCP/4.2.2/arm-iop/0eval-data/xie/scm-forcing/iop_at_mao/GOAMAZON/IOP2_v1.2'
+	elif [ $obs_smp = ceop64 ]; then
 		if [ $site = BERMS ]; then
-			yymm=200307
 			SYYYYMMDDHH=2003070500
 			EYYYYMMDDHH=2003080100
-			gr_stime=00Z05Jul2003
-		elif [ $site = TIEBET ]; then
-			yymm=200306
+		elif [ $site = TIBET ]; then
 			SYYYYMMDDHH=2003060200
 			EYYYYMMDDHH=2003062900
-			gr_stime=00Z02Jun2003
 		elif [ $site = KOREAN -o $sub = HIMALAYAS ]; then
-			yymm=200301
 			SYYYYMMDDHH=2003010100
 			EYYYYMMDDHH=2003020200
-			gr_stime=00Z01Jan2003
 		else
-			yymm=200307
 			SYYYYMMDDHH=2003070100
 			EYYYYMMDDHH=2003080100
-			gr_stime=00Z01Jul1997
 		fi
 		exp=A
 	else
-		echo "unknown SMP observation $obs"
+		echo "unknown SMP observation $obs_smp"
 		exit 1
 	fi
 	#
@@ -156,18 +238,28 @@ while [ $sub -le $subc ]; do
 	# If you wish, you may modify EXECDIR to /tmp directory and keep these
 	# scripts on your permanent disk.
 	#
-	EXECDIR=@OUTPUT_DIR@/$RUNNAME/sub$exp
+	if [ $obs_smp = usgp37 -o $obs_smp = mana45 -o \
+	     $obs_smp = mc3e42 -o $obs_smp = peca41 -o \
+		 $obs_smp = iop142 -o $obs_smp = iop242 ]; then
+		EXECDIR=@OUTPUT_DIR@/$sname/$SYYYYMMDDHH
+	else
+		EXECDIR=@OUTPUT_DIR@/$obs_smp/sub$exp
+	fi
 	mkdir -p $EXECDIR 2>/dev/null
+	#
+	# namelist
+	#
+	. @RUNSCR_DIR@/namelist $EXECDIR || exit 8
 	#
 	# -------------  do not change below  -------------------------------------
 	#
-	INITIAL_SIGMA=@SMPCON_DIR@/ncep_sfc/sig.anl.$SYYYYMMDDHH.ieee
-	INITIAL_SFC=@SMPCON_DIR@/ncep_sfc/sfc.anl.$SYYYYMMDDHH.ieee
-	INITIAL_SFC_FILE_TYPE=osu1
-	#
 	#  blank means use guess (in the sfc file).
 	#
+#	SST_ANL_T0=/data/DATABASE/SST/OISST/gisst22.${YYYYS}.daily
 	SST_ANL_T0=@CON_DIR@/gisst22.${YYYYS}.daily
+	if [ ! -s $SST_ANL_T0 ]; then
+	SST_ANL_T0=@CON_DIR@/clim.sst.grib
+	fi
 	ICE_ANL_T0=@CON_DIR@/clim.ice.r2.1979-1998.grib
 	SNO_ANL_T0=@CON_DIR@/clim.snow.r2.1979-1998.grib
 	SCV_ANL_T0=
@@ -175,9 +267,9 @@ while [ $sub -le $subc ]; do
 	isnogrb0=0
 	isstgrb0=1
 	ism2grb0=0
-	SST_ANL=@CON_DIR@/gisst22.$YYYYS.daily
-	ICE_ANL=@CON_DIR@/clim.ice.r2.1979-1998.grib
-	SNO_ANL=@CON_DIR@/clim.snow.r2.1979-1998.grib
+	SST_ANL=$SST_ANL_T0
+	ICE_ANL=$ICE_ANL_T0
+	SNO_ANL=$SNO_ANL_T0
 	SCV_ANL=
 	iicegrb=$iicegrb0
 	isnogrb=$isnogrb0
@@ -197,25 +289,30 @@ while [ $sub -le $subc ]; do
 	#
 	# Initial & BDY conditions
 	#
-	if [ $obs = toga ]; then
-		cp @SMPCON_DIR@/TOGA/basic/toga40.plev $EXECDIR/obs.plev               || exit 8
+	if [ $obs_smp = toga40 ]; then
 		cp @SMPCON_DIR@/TOGA/9211/_dat/basic_flds.ifa_v2.1 $EXECDIR/.	       || exit 8
 		cp @SMPCON_DIR@/TOGA/9211/_dat/deriv_flds.ifa_v2.1 $EXECDIR/.	       || exit 8
 		cp @SMPCON_DIR@/TOGA/9211/_dat/lsf_flds.ifa_v2.1 $EXECDIR/.		       || exit 8
 		cp @SMPCON_DIR@/TOGA/9211/_dat/misc_flds.ifa_v2.1 $EXECDIR/.		   || exit 8
-		cp @SMPCON_DIR@/ncep_sfc/sfc.anl.$YYYYS$MMS$DDS$HHS.ieee $EXECDIR/.	   || exit 8
-	elif [ $obs = arm00 ]; then
-		cp @SMPCON_DIR@/ARM/basic/arm_sgp00.plev $EXECDIR/obs.plev		       || exit 8
+	elif [ $obs_smp = trmm37 ]; then
+		cp @SMPCON_DIR@/TRMM/9907/surface_kwjx.dat $EXECDIR/.			       || exit 8
+		cp @SMPCON_DIR@/TRMM/9907/layer_kwjx.dat $EXECDIR/.					   || exit 8
+	elif [ $obs_smp = arms38 ]; then
 		cp @SMPCON_DIR@/ARM/0003/surface_0003.dat $EXECDIR/.			       || exit 8
 		cp @SMPCON_DIR@/ARM/0003/layer_0003.dat $EXECDIR/.			           || exit 8
-		cp @SMPCON_DIR@/ncep_sfc/sfc.anl.$YYYYS$MMS$DDS$HHS.ieee $EXECDIR/.	   || exit 8
-	elif [ $obs = arm97 ]; then
-		cp @SMPCON_DIR@/ARM/basic/arm_sgp97.plev $EXECDIR/obs.plev		       || exit 8
+	elif [ $obs_smp = arms18 ]; then
 		cp @SMPCON_DIR@/ARM/9707/source/zhang_v2/surface_9707v2.dat $EXECDIR/. || exit 8
 		cp @SMPCON_DIR@/ARM/9707/source/zhang_v2/layer_9707v2.dat $EXECDIR/.   || exit 8
 		cp @SMPCON_DIR@/ARM/9707/drv/jul97_arm_version2/jul97_zhang_advt_timescale_in.dat $EXECDIR/rlx_advtscl.dat	|| exit 8
-		cp @SMPCON_DIR@/ncep_sfc/sfc.anl.$YYYYS$MMS$DDS$HHS.ieee $EXECDIR/.	   || exit 8
-        else
+	elif [ $obs_smp = usgp37 -o $obs_smp = mana45 -o \
+	       $obs_smp = mc3e42 -o $obs_smp = peca41 -o \
+		   $obs_smp = iop142 -o $obs_smp = iop242 ]; then
+cat > $EXECDIR/namelist.smp << EOF
+&smplist
+idir='$DCP_DIR',
+/
+EOF
+	elif [ $obs_smp = ceop64 ]; then
 		cp @SMPCON_DIR@/CEOP/basic/obs.sig $EXECDIR/obs.sig                    || exit 8
 #		cp /disk6/skh/SCM/obs/CEOP/$site/_out/${site}__MOLTS.dat $EXECDIR/molts.dat           || exit 8
 #		cp /disk6/skh/SCM/obs/CEOP/$site/_out/${site}_${yymm}_sfc.dat $EXECDIR/sfc.dat        || exit 8
@@ -225,13 +322,18 @@ while [ $sub -le $subc ]; do
 #		if [ $site != KOREAN -o $site != HIMALAYAS -o $site != THAILAND ]; then
 #			cp /disk6/skh/SCM/obs/CEOP/$site/_out/${site}_${yymm}_flx.dat $EXECDIR/flx.dat     || exit 8
 #		fi
-		cp @SMPCON_DIR@/ncep_sfc/sfc.anl.$YYYYS$MMS$DDS$HHS.ieee $EXECDIR/.	   || exit 8
 	fi
+	INITIAL_SFC=$INITIAL_SFC_DIR/sfc.anl.$YYYYS$MMS$DDS$HHS.ieee
+	if [ ! -s $INITIAL_SFC ]; then
+		INITIAL_SFC=/data/DATABASE/ANALYSIS/GFS/gfs_sig/$YYYYS/$MMS/gfs.$YYYYS$MMS$DDS$HHS/gfs.t00z.sfcanl
+	fi
+	ln -sf $INITIAL_SFC $EXECDIR/cnvrt_initial_sfc   || exit 8
+#
 	rm -f ERROR.out 2>/dev/null
 	#
 	# Forecast section
 	#
-	if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ];then
+	if [ -s sigit -a -s sigitdt -a -s sfci ];then
 		#
 		#  Restart
 		#
@@ -246,12 +348,6 @@ while [ $sub -le $subc ]; do
 		rm out
 	else
 		#
-		# co2
-		#
-		if [ ! -s co2con ] ; then
-			@RUNSCR_DIR@/co2 || exit 8
-		fi
-		#
 		# mountain
 		# 
 		if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
@@ -262,59 +358,28 @@ while [ $sub -le $subc ]; do
 		#
 		h=00
 		#
-		@RUNSCR_DIR@/presmp $YYYYS$MMS$DDS$HHS $YYYYE$MME$DDE$HHE \
-						model_initial_sig model_initial_sfc || exit 8
-		#
-		#  convert to 4-digit year if not
-		#
-		century=`expr \( \( $YYYYS - 1 \) / 100 \) + 1`
-		@RUNSCR_DIR@/cnv4dig model_initial_sig model_initial_sfc \
-				sigit smpsfci $INITIAL_SFC_FILE_TYPE $century || exit 8
-		if [ $smp_sfc = no ]; then 
-			cp smpsfci sfci
-		fi
-		#
-		# Run sfc process 
-		#
-		if [ $smp_sfc = yes ]; then 
-			#
-			# Conversion from ascii to native format
-			#
-			fmt=`echo $INITIAL_SIGMA | sed 's/.*\.//g'`
-			@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
-								62:192:94:28            \
-								-1:-1:-1:-1:-1          \
-								$fmt:bin $INITIAL_SIGMA:$INITIAL_SFC \
-								cnvrt_initial_sig:cnvrt_initial_sfc || exit 8
-			#
-			# Change input resolution to model resolution
-			#
-			@RUNSCR_DIR@/chgr dummy cnvrt_initial_sfc \
-							sigit sfci $INITIAL_SFC_FILE_TYPE || exit 8
-			#
-			#  convert initial sfc file type to model sfc file type
-			#
-			SST_GRB_T0=`eval echo $SST_ANL_T0`
-			SNO_GRB_T0=`eval echo $SNO_ANL_T0`
-			SCV_GRB_T0=`eval echo $SCV_ANL_T0`
-			ICE_GRB_T0=`eval echo $ICE_ANL_T0`
-			export SST_GRB_T0 SNO_GRB_T0 SCV_GRB_T0 ICE_GRB_T0
-			export iicegrb0 isstgrb0 isnogrb0 ism2grb
-			@RUNSCR_DIR@/sfc0 gsm sfci sfco $INITIAL_SFC_FILE_TYPE || exit 8
-			cp sfco sfci
-		fi
-		#
-		cp sigit sigitdt
-		if [ $? -ne 0 ] ; then
-			echo "`date` $0: cp sigit sigitdt failed" >>ERROR.out 
-			exit 8
-		fi
+		# Run presmp process for sigit
+		#  
+		@RUNSCR_DIR@/presmp $YYYYS$MMS$DDS$HHS $YYYYE$MME$DDE$HHE|| exit 8
+		# 
 		cp sigit sig.ft$h
+		cp sigit sigitdt
 		if [ $? -ne 0 ] ; then
 			echo "`date` $0: cp sigit sig.ft$h failed" >>ERROR.out
 			exit 8
 		fi
-		cp sfci  sfc.ft$h
+		#
+		# Run sfc process 
+		#
+		SST_GRB_T0=`eval echo $SST_ANL_T0`
+		SNO_GRB_T0=`eval echo $SNO_ANL_T0`
+		SCV_GRB_T0=`eval echo $SCV_ANL_T0`
+		ICE_GRB_T0=`eval echo $ICE_ANL_T0`
+		export SST_GRB_T0 SNO_GRB_T0 SCV_GRB_T0 ICE_GRB_T0
+		export iicegrb0 isstgrb0 isnogrb0 ism2grb
+		@RUNSCR_DIR@/sfc0 gsm cnvrt_initial_sfc  || exit 8
+		# 
+		cp sfci sfc.ft$h
 		if [ $? -ne 0 ] ; then
 			echo "`date` $0: cp sfci sfc.ft$h failed" >>ERROR.out
 			exit 8
@@ -326,7 +391,7 @@ while [ $sub -le $subc ]; do
 	fi
 	#
 	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-			$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+			$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	#
 	endhour=$ENDHOUR
 	inchour=$INCHOUR
@@ -384,7 +449,7 @@ while [ $sub -le $subc ]; do
 		#	echo "`date` $0: mv sigp.ft$hx sigitdt failed" >>ERROR.out
 		#	exit 8
 		#fi
-		cp sfc.ft$hx sfci
+		#cp sfc.ft$hx sfci
 		if [ $? -ne 0 ] ; then
 			echo "`date` $0: cp sfc.ft$hx sfci failed" >>ERROR.out
 			exit 8
@@ -392,6 +457,7 @@ while [ $sub -le $subc ]; do
 		#
 		#  rename fgb   pgb  dg3cld
 		#
+        if [ "$h" == "000" ]; then h = 00 ; fi
 		YYYY=$YYYYS
 		MM=$MMS
 		DD=$DDS
@@ -400,7 +466,7 @@ while [ $sub -le $subc ]; do
 		hr_end=$hx
 		hr_stp=$hr_str
 		while [ $hr_stp -le $hr_end ] ; do
-			fdate=`@ETC_DIR@/maketim $YYYY$MM$DD$HH -h $hr_stp`
+			fdate=`@ETC_DIR@/validate.s $YYYY$MM$DD$HH $hr_stp`
 			if [ $hr_stp -ne 00 -a $hr_stp -lt 10 ] ; then
 				hr_stp=0$hr_stp
 			fi
@@ -413,7 +479,7 @@ while [ $sub -le $subc ]; do
 		hr_end=$hx
 		hr_stp=$hr_str
 		while [ $hr_stp -le $hr_end ] ; do
-			fdate=`@ETC_DIR@/maketim $YYYY$MM$DD$HH -h $hr_stp`
+			fdate=`@ETC_DIR@/validate.s $YYYY$MM$DD$HH $hr_stp`
 			if [ $hr_stp -ne 00 -a $hr_stp -lt 10 ] ; then
 				hr_stp=0$hr_stp
 			fi
@@ -437,9 +503,16 @@ while [ $sub -le $subc ]; do
 		#
 		h=$hx
 	done
-	if [ -f @POST_DIR@/shell/make_ctl_$obs.$smp_lsm.sh ]; then
-		@POST_DIR@/shell/make_ctl_$obs.$smp_lsm.sh $EXECDIR $gr_stime $INTSIG $ENDHOUR
-	fi
+	#
+	# make control file for GrADs
+	#
+	@RUNSCR_DIR@/makectl pgb
+	@RUNSCR_DIR@/makectl fgb
+	@RUNSCR_DIR@/makectl dg3gb
+	@RUNSCR_DIR@/makectl dcp
+	@RUNSCR_DIR@/makectl cpsgb
+	@RUNSCR_DIR@/makectl cpscld
+	#	
 	if [ -d @POST_DIR@/psmp ]; then
 		for file in `/bin/ls @POST_DIR@/psmp/*.in | sed 's/\.in$//g'`; do
 			sed "s%@EXEC_DIR@%$EXECDIR%g;s%@RUN_DIR@%@RUNS_DIR@%g" $file.in > $file

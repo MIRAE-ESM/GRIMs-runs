@@ -1,3 +1,4 @@
+#!/bin/sh
 PROG=rmtn
 #
 set -x
@@ -34,18 +35,17 @@ else
         rm -f @FTNID@[0-9]* 2>/dev/null
 fi
 
-@FTASS@ $avg                           @FTNID@11
-@FTASS@ $var                           @FTNID@12
-@FTASS@ $max                           @FTNID@13
-@FTASS@ $slm                           @FTNID@14
-@FTASS@ r_slmsk                        @FTNID@51
-@FTASS@ r_orogrd                       @FTNID@52
-@FTASS@ r_mtnvar                       @FTNID@53
-@FTASS@ r_oroggd                       @FTNID@54
-@FTASS@ r_smooth_oroggd                @FTNID@55
-@FTASS@ r_oroview.ieee                 @FTNID@71
-@FTASS@ r_oroview_latlon.ieee          @FTNID@72
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@   @FTNID@1
+@FTASS@ $avg                    @FTNID@11
+@FTASS@ $var                    @FTNID@12
+@FTASS@ $max                    @FTNID@13
+@FTASS@ $slm                    @FTNID@14
+@FTASS@ r_slmsk                 @FTNID@51
+@FTASS@ r_orogrd                @FTNID@52
+@FTASS@ r_mtnvar                @FTNID@53
+@FTASS@ r_oroggd                @FTNID@54
+@FTASS@ r_smooth_oroggd         @FTNID@55
+@FTASS@ r_oroview.ieee          @FTNID@71
+@FTASS@ r_oroview_latlon.ieee   @FTNID@72
 #
 if [ @SYSTEM@ = dec ]; then
   ulimit -s 1024000

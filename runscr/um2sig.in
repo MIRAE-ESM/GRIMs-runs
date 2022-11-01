@@ -1,0 +1,119 @@
+#!/bin/sh
+set -x
+#
+DBG=no
+PROG=um2sig
+#
+# setup
+#
+INFILE=$1
+SIGFILE=$2
+IY=`echo $3 | cut -c1-4`
+IM=`echo $3 | cut -c5-6`
+ID=`echo $3 | cut -c7-8`
+IH=`echo $3 | cut -c9-10`
+FH=`echo $3 | cut -c11-12`
+ulimit -d unlimited
+ulimit -s unlimited
+ulimit -v unlimited
+#
+# namelist
+#
+cat > $PROG.parm << EOF
+&NAMUM2SIG
+ INFILE='$INFILE'
+ IY=$IY,IM=$IM,ID=$ID,IH=$IH,FHOUR=$FH.,
+ PSNAME='SURFACE_PRESSURE_AFTER_TIMESTEP',
+ GZNAME='OROGRAPHY_(_STRAT_LOWER_BC)',
+ PNAME='PRESSURE_AT_RHO_LEVELS_AFTER_TS',
+ UNAME='U_COMPNT_OF_WIND_AFTER_TIMESTEP',
+ VNAME='V_COMPNT_OF_WIND_AFTER_TIMESTEP',
+ THNAME='THETA_AFTER_TIMESTEP',
+ QVNAME='SPECIFIC_HUMIDITY_AFTER_TIMESTEP',
+ QCNAME='QCL_AFTER_TIMESTEP',
+ QINAME='QCF_AFTER_TIMESTEP',
+&END
+EOF
+#
+# link
+#
+@FTASS@ orogrd.smth	                   @FTNID@21
+@FTASS@ @CON_DIR@/aerosol.macc.asc	   @FTNID@47
+@FTASS@ @CON_DIR@/ozone_gmao.asc	   @FTNID@48
+@FTASS@ @CON_DIR@/co2_gosat.asc	       @FTNID@49
+@FTASS@ $SIGFILE                       @FTNID@51
+@FTASS@ @CON_DIR@/chememis.maccity.asc @FTNID@60
+@FTASS@ @CON_DIR@/gocartbg_h2o2.asc    @FTNID@61
+@FTASS@ @CON_DIR@/gocartbg_oh.asc      @FTNID@62
+@FTASS@ @CON_DIR@/mozart_data.asc      @FTNID@63
+@FTASS@ @CON_DIR@/CAMSiRA_mod1_ratio.asc @FTNID@70
+if [ "$DBG" == "yes" ]; then
+	@FTASS@ gzps.bin @FTNID@90
+	@FTASS@ var.bin @FTNID@91
+fi
+#
+# execute
+#
+@BIN_DIR@/$PROG.x < $PROG.parm 1> $PROG.out 2>&1  || exit 8
+
+if [ "$DBG" == "yes" ]; then
+# make ctl
+cat > gzps.ctl << EOF
+dset ^./gzps.bin
+options byteswapped sequential yrev
+undef -9.99e8
+xdef   192 linear    0.00000  1.87500
+ydef    94 levels
+ -88.54195 -86.65317 -84.75323 -82.85077 -80.94736 -79.04348 -77.13935 -75.23506 -73.33066 -71.42619
+ -69.52166 -67.61710 -65.71251 -63.80789 -61.90326 -59.99861 -58.09395 -56.18928 -54.28460 -52.37991
+ -50.47522 -48.57052 -46.66582 -44.76111 -42.85640 -40.95169 -39.04697 -37.14225 -35.23753 -33.33281
+ -31.42808 -29.52336 -27.61863 -25.71390 -23.80917 -21.90444 -19.99971 -18.09498 -16.19024 -14.28551
+ -12.38078 -10.47604  -8.57131  -6.66657  -4.76184  -2.85710  -0.95237   0.95237   2.85710   4.76184
+   6.66657   8.57131  10.47604  12.38078  14.28551  16.19024  18.09498  19.99971  21.90444  23.80917
+  25.71390  27.61863  29.52336  31.42808  33.33281  35.23753  37.14225  39.04697  40.95169  42.85640
+  44.76111  46.66582  48.57052  50.47522  52.37991  54.28460  56.18928  58.09395  59.99861  61.90326
+  63.80789  65.71251  67.61710  69.52166  71.42619  73.33066  75.23506  77.13935  79.04348  80.94736
+  82.85077  84.75323  86.65317  88.54195
+zdef   1 levels 1000
+tdef   1 linear             12Z25JUL2011      6hr
+vars    4
+gzi      0 99 aa
+psi      0 99 aa
+gz       0 99 aa
+ps       0 99 aa
+endvars
+EOF
+cat > var.ctl << EOF
+dset ^./var.bin
+options byteswapped sequential yrev
+undef -9.99e8
+xdef   192 linear    0.00000  1.87500
+ydef    94 levels
+ -88.54195 -86.65317 -84.75323 -82.85077 -80.94736 -79.04348 -77.13935 -75.23506 -73.33066 -71.42619
+ -69.52166 -67.61710 -65.71251 -63.80789 -61.90326 -59.99861 -58.09395 -56.18928 -54.28460 -52.37991
+ -50.47522 -48.57052 -46.66582 -44.76111 -42.85640 -40.95169 -39.04697 -37.14225 -35.23753 -33.33281
+ -31.42808 -29.52336 -27.61863 -25.71390 -23.80917 -21.90444 -19.99971 -18.09498 -16.19024 -14.28551
+ -12.38078 -10.47604  -8.57131  -6.66657  -4.76184  -2.85710  -0.95237   0.95237   2.85710   4.76184
+   6.66657   8.57131  10.47604  12.38078  14.28551  16.19024  18.09498  19.99971  21.90444  23.80917
+  25.71390  27.61863  29.52336  31.42808  33.33281  35.23753  37.14225  39.04697  40.95169  42.85640
+  44.76111  46.66582  48.57052  50.47522  52.37991  54.28460  56.18928  58.09395  59.99861  61.90326
+  63.80789  65.71251  67.61710  69.52166  71.42619  73.33066  75.23506  77.13935  79.04348  80.94736
+  82.85077  84.75323  86.65317  88.54195
+zdef  28 linear 1 1
+tdef   1 linear             12Z25JUL2011      6hr
+vars    12
+gz    0  99 aa
+ps    0  99 aa
+u     28 99 aa
+v     28 99 aa
+t     28 99 aa
+qv    28 99 aa
+qc    28 99 aa
+qr    28 99 aa
+qi    28 99 aa
+qs    28 99 aa
+o3    28 99 aa
+cld   28 99 aa
+endvars
+EOF
+fi

@@ -1,0 +1,245 @@
+#!/bin/sh
+set -ax
+#
+# this script makes 72 hour integration starting from an example initial
+# condition. ideal for first testing the system on new computer system
+#
+# ---------------  user changeable parameters ------------------------
+#
+# Change the following variable if you are running separate experiments
+# from the same directory
+#
+JRA_TYPE='JRA-55'
+#
+# experiment name
+#
+RUNNAME=
+#
+# Intervals of sfc execution, sigma output, sfc output and flx output
+# Various options for running the model
+#
+SDATE=2009011300        # Starting forecast date
+ENDHOUR=`expr 24 \* 2`  # Length of model integration in hour
+INTSFCX=24              # Time interval to run surface merging
+INTOMLX=24              # Time interval to run ocean mixed layer model
+INTSIG=6                # Time interval to create sigma output file
+INTSFC=6                # Time interval to create surface output file
+INTFLX=6                # Time interval to create surface flux output file
+INTNCO=6                # Time interavl to create nc output file
+SWHR_GBL=3              # Time interval of shortwave radiation flux (default=6)
+LWHR_GBL=3              # Time interval of longwave  radiation flux
+INCHOUR=$ENDHOUR        # Forecast hour per one execution
+INTRESTART=$ENDHOUR
+#
+NENS_STOCH=1            # Ensemble number for stochastic perturbation
+#
+FCST_RESTART=yes        # Option indicating whether current forecast is first
+DEL_FLUX=no             # Option deleting flux file after forecst (yes;no)
+SIG_GRIB=no             # Option gribing at sigma layer after forecst (yes;no)
+#
+# ------------- below for expert user only -------------------------------------
+#
+# If you wish, you may modify EXECDIR to /tmp directory and keep these
+# scripts on your permanent disk.
+#
+SYYYY=`echo $SDATE | cut -c1-4`
+SYYYYMM=`echo $SDATE | cut -c1-6`
+SYYYYMMDD=`echo $SDATE | cut -c1-8`
+if [ -z $RUNNAME ]; then
+	EXECDIR=@OUTPUT_DIR@/$SDATE
+else 
+	EXECDIR=@OUTPUT_DIR@/$RUNNAME
+fi
+export EXECDIR
+#
+# -------------  do not change below  ------------------------------------------
+#
+mkdir -p $EXECDIR 2>/dev/null
+#
+# namelist
+#
+. @RUNSCR_DIR@/namelist $EXECDIR
+#
+GRIMS_INITIAL_DIR=/storage/GRIMsin
+JRA_PRESSURE_DIR=/ssw_home/storage-soonsin/REANA/$JRA_TYPE/4xdaily
+JRA_SURFACE_DIR=${GRIMS_INITIAL_DIR}/boundary_grib/JRA-55
+#
+INITIAL_SFC=${GRIMS_INITIAL_DIR}/R2/${SYYYYMM}_R2/sfc.anl.${SDATE}.ieee
+INITIAL_SFC_FILE_TYPE=osu1
+#
+# blank means use guess (in the sfc file).
+#
+SST_ANL_T0=${GRIMS_INITIAL_DIR}/gisst_v2.1_nc/oisst-avhrr-v02r01.${SYYYYMMDD}.nc
+ICE_ANL_T0=${GRIMS_INITIAL_DIR}/gisst_v2.1_nc/oisst-avhrr-v02r01.${SYYYYMMDD}.nc
+#SNO_ANL_T0=${JRA_SURFACE_DIR}/weasd/anl_land125.065_snwe.${SYYYY}010100_${SYYYY}123118
+SNO_ANL_T0=
+SCV_ANL_T0=
+#
+iicegrb0=1              # 0 : use guess, 1 : use grib file
+isnogrb0=0
+isstgrb0=1
+ism2grb0=0
+#
+SST_ANL=${SST_ANL_T0}
+ICE_ANL=${ICE_ANL_T0}
+SNO_ANL=
+SCV_ANL=
+#
+iicegrb=1
+isnogrb=0
+isstgrb=1
+ism2grb=0
+#
+INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
+#
+FCST_NPES=@NPES@
+FCST_NCPUS=@NCPUS@
+#
+CPSCLD=`grep 'EXPLICIT_CLOUDINESS' @SRCS_DIR@/define.h | awk '{print $1}' | sed 's/\#//g'`
+#
+# cd to run directory
+#
+scrnam=`echo $0 | sed 's?.*/??g'`
+cp $0 $EXECDIR/0LOG.$scrnam
+cp @SRCS_DIR@/define.h $EXECDIR/0LOG.define.h
+ls -l @BIN_DIR@ >$EXECDIR/0LOG.bindates
+cd $EXECDIR || exit 8
+#
+# renew log file
+#
+cat @PWD@/$0 > ERROR.out
+echo '==============' >>ERROR.out
+#
+# Automatic restart
+#
+if [ @BARO_TEST@ != 1 ]; then
+	if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ]; then
+		#
+		# Restart
+		#
+		h=`@ETC_DIR@/fhour sigit`
+		echo fhour in the sigit file = $h
+	else
+		#
+		# mountain
+		#
+		if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
+			@RUNSCR_DIR@/mtn || exit 8
+		fi
+		#
+		# Initial start.
+		#
+		h=00
+		#
+		# Change input resolution to model resolution
+		#
+		export JRA_PRESSURE_DIR SDATE EXECDIR JRA_TYPE
+		@RUNSCR_DIR@/chgr_jra || exit 8
+		#
+		# Convert initial sfc file type to model sfc file type
+		#
+		SST_GRB_T0=`eval echo $SST_ANL_T0`
+		SNO_GRB_T0=`eval echo $SNO_ANL_T0`
+		SCV_GRB_T0=`eval echo $SCV_ANL_T0`
+		ICE_GRB_T0=`eval echo $ICE_ANL_T0`
+		export SST_GRB_T0 SNO_GRB_T0 SCV_GRB_T0 ICE_GRB_T0
+		export iicegrb0 isstgrb0 isnogrb0 ism2grb
+		@RUNSCR_DIR@/sfc0 gsm $INITIAL_SFC || exit 8
+		#
+		cp sigit sigitdt  || exit 8
+		cp sigit sig.ft$h || exit 8
+		cp sfci  sfc.ft$h || exit 8
+		#
+		@ETC_DIR@/date sigit >date.$$ || exit 8
+		read HH MM DD yyyy FH <date.$$ ; rm date.$$
+		echo $yyyy $MM $DD $HH $FH
+	fi
+else
+	h=0
+fi
+#
+#  forecast hour loop
+#
+xc=0
+while [ $h -lt $ENDHOUR ] ; do
+	#
+	hx=`expr $h + $INCHOUR`
+	if [ $hx -gt $ENDHOUR ] ; then
+		hx=$ENDHOUR
+	fi
+	if [ $hx -lt 10 ];then hx=0$hx;fi
+	#
+	SST_GRB=`eval echo $SST_ANL`
+	SNO_GRB=`eval echo $SNO_ANL`
+	SCV_GRB=`eval echo $SCV_ANL`
+	ICE_GRB=`eval echo $ICE_ANL`
+	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
+	export SWHR_GBL LWHR_GBL NENS_STOCH
+	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
+						$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
+	#
+	# Execute forecast
+	#
+	if [ "@BATCHQUE@" == "qsub" ]; then
+#        @BATCHQUE@ -W block=true @RUNSCR_DIR@/fcst || exit 8
+        fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst`
+		log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
+	else
+		fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	fi
+	#
+	# Postprocess (pgb, fgb)
+	#
+	if [ @BARO_TEST@ != 1 ]; then
+		if [ @DOPOST@ = yes ] ; then
+			phs=$h
+			phe=$hx
+			phinc=$INTSIG
+			fhs=$h
+			fhe=$hx
+			fhinc=$INTFLX
+			if [ $h -gt 0 ]; then
+				phs=`expr $h + $INTSIG`
+				fhs=`expr $h + $INTFLX`
+			fi
+			export phs phe phinc fhs fhe fhinc SIG_GRIB
+			if [ "@BATCHQUE@" == "qsub" ]; then
+#				@BATCHQUE@ -W block=true @RUNSCR_DIR@/post_gmp || exit 8
+				@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
+                postid=`@BATCHQUE@ @RUNSCR_DIR@/post_gmp`
+			else
+				@RUNSCR_DIR@/post_gmp $phs $phe $phinc  || exit 8
+			fi
+			#
+			# Wait queue job for post
+			#
+#			if [ "@BATCHQUE@" != "" ]; then
+				@RUNSCR_DIR@/wait_que_job $postid $log_name @BATCHstatus@ || exit 8
+				# delete flux file
+				if [ "$DEL_FLUX" = yes ]; then
+					if [ -s fgb.ft$fhe ]; then
+						@RUNSCR_DIR@/delfile flx 0 $hx $INTFLX || exit 8
+					fi
+				fi
+#			fi
+			#
+			# archive files
+			#
+			if [ "$CPSCLD" = "define" ]; then
+				cp cpscld.ft$hx cpscldi || exit 8
+			fi
+		elif [ @CATPGB@ = yes ] ; then
+			@ETC_DIR@/catpgb
+		fi
+	fi
+	#
+	h=$hx
+done
+#
+wait
+echo "`date` $0: Completely ended"
+#
+if [ @SYSTEM@ = mac -a @MARCH@ = mpi ] ; then
+	lamclean
+	lamhalt
+fi

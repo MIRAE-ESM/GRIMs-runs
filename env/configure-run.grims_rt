@@ -388,11 +388,6 @@ else
 fi
 #
 grep '^sfcftyp=noa1' $CURR_DIR/cvar.env >/dev/null
-if [ $? -ne 0 ] ; then
-        NOAH=no
-else
-        NOAH=yes
-fi
 #
 FCST_SFC_FILE_TYPE=`grep '^sfcftyp=' $CURR_DIR/cvar.env | cut -d'=' -f2`
 #
@@ -561,7 +556,6 @@ s%@BARO_TEST@%$BARO_TEST%g
 s%@CLASS@%$CLASS%g
 s%@DELTAT@%$DELTAT%g
 s%@VEG_RES@%$VEG_RES%g
-s%@NOAH@%$NOAH%g
 s%@FCST_SFC_FILE_TYPE@%$FCST_SFC_FILE_TYPE%g
 s%@GTOPO30@%$GTOPO30%g
 s%@DOPOST@%$DOPOST%g

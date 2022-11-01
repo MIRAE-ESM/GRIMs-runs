@@ -1,0 +1,5 @@
+#!/bin/sh
+#PBS -V
+#PBS -l ncpus=1
+#PBS -q normal_m@nuri
+#PBS -j eo

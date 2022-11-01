@@ -22,11 +22,13 @@ INTOMLX=`echo $3 | cut -d':' -f2`
 INTSIG=`echo $4 | cut -d':' -f1`
 INTSFC=`echo $4 | cut -d':' -f2`
 INTFLX=`echo $4 | cut -d':' -f3`
-INTRESTART=`echo $4 | cut -d':' -f4`
+INTNCO=`echo $4 | cut -d':' -f4`
+INTRESTART=`echo $4 | cut -d':' -f5`
 #
 SWHR_GBL=${SWHR_GBL:=6}
 LWHR_GBL=${LWHR_GBL:=6}
 INTPFIX=${INTPFIX:=24}
+NENS_STOCH=${NENS_STOCH:=1}
 #
 namfile=fcst.parm
 if [ "@MODEL@" = dfs ]; then
@@ -54,31 +56,23 @@ cat >> $namfile <<EOF
  INTSIG=$INTSIG,
  INTSFC=$INTSFC,
  INTFLX=$INTFLX,
+ INTNCO=$INTNCO,
  INTRESTART=$INTRESTART,
+ NENS_STOCH=$NENS_STOCH,
 /
- &SOIL_VEG
- DEFINED_VEG=13,
- DEFINED_SOIL=9,
-/
+
  &NAMSFC
  FNOROG='orogrd.smth'
  FNMASK='slmsk'
  FNMSKG='@CON_DIR@/clim.maskh.grib'
  CONDIR='@CON_DIR@'
  BINDIR='@BIN_DIR@'
- FNGRB(1)='clim.glacier.grib    '
- FNGRB(2)='clim.maxice.grib     '
  FNGRB(4)='${ICE_GRB:=@CON_DIR@/clim.ice.grib}'
  FNGRB(5)='$SCV_GRB'
  FNGRB(6)='${SNO_GRB:=@CON_DIR@/clim.snow.grib}'
  FNGRB(7)='${SST_GRB:=@CON_DIR@/clim.sst.grib}'
- FNGRB(8)='clim.yhalbedo.grib   '
- FNGRB(9)='clim.sibalbedo.grib  '
- FNGRB(10)='clim.yhalbedo.grib   '
- FNGRB(11)='$SM2_GRB  '
- FNGRB(13)='clim.sibrough.grib   '
- FNGRB(14)='clim.sibresis.grib   '
- FNGRB(18)='@VEG_FRAC@           '
+ FNGRB(15)='$SM2_GRB  '
+ FNGRB(33)='${ICE_GRB:=@CON_DIR@/clim.ice.grib}'
 EOF
 #
 if [ `echo ${iicegrb:=0}` -eq 1 ]; then
@@ -121,17 +115,17 @@ else
     echo " lfgrb(5,7)=F" >> $namfile
 fi
 if [ `echo ${ism2grb:=0}` -eq 1 ]; then
-    echo " lfgrb(1,11)=F" >> $namfile
-    echo " lfgrb(2,11)=T" >> $namfile
-    echo " lfgrb(3,11)=F" >> $namfile
-    echo " lfgrb(4,11)=T" >> $namfile
-    echo " lfgrb(5,11)=F" >> $namfile
+    echo " lfgrb(1,15)=F" >> $namfile
+    echo " lfgrb(2,15)=T" >> $namfile
+    echo " lfgrb(3,15)=F" >> $namfile
+    echo " lfgrb(4,15)=T" >> $namfile
+    echo " lfgrb(5,15)=F" >> $namfile
 else
-    echo " lfgrb(1,11)=F" >> $namfile
-    echo " lfgrb(2,11)=F" >> $namfile
-    echo " lfgrb(3,11)=F" >> $namfile
-    echo " lfgrb(4,11)=F" >> $namfile
-    echo " lfgrb(5,11)=F" >> $namfile
+    echo " lfgrb(1,15)=F" >> $namfile
+    echo " lfgrb(2,15)=F" >> $namfile
+    echo " lfgrb(3,15)=F" >> $namfile
+    echo " lfgrb(4,15)=F" >> $namfile
+    echo " lfgrb(5,15)=F" >> $namfile
 fi
 echo '/' >> $namfile
 #

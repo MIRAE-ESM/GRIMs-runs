@@ -27,6 +27,10 @@ HHSS=00          # initial hour
 #
 NENS=5 
 #
+# remove output except for monthly average
+#
+RMOUTPUT=no
+#
 # Ensemble initial condition time interval
 #
 INCENS=24
@@ -45,7 +49,6 @@ INITIAL_SFC=$SIGDIR/sfc.anl.\$YYYYS\$MMS\$DDS\$HHS.ieee
 #INITIAL_SIG=$SIGDIR/\$YYYYS/sig.anl.\$YYYYS\$MMS\$DDS\$HHS.ieee
 #INITIAL_SFC=$SIGDIR/\$YYYYS/sfc.anl.\$YYYYS\$MMS\$DDS\$HHS.ieee
 INPUT_RESOLUTION=t62k28
-INITIAL_SFC_FILE_TYPE=osu1
 #
 # sst, ice and snow specificatinos
 #
@@ -98,10 +101,11 @@ INTOMLX=24
 INTSIG=6
 INTSFC=6
 INTFLX=6
-INTRESTART=480
-INCHOUR=$INTRESTART
-SWHR_GBL=6              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=6              # Time interval of longwave  radiation flux
+INTNCO=6
+INCHOUR=7200         # Forecast hour for execution
+INTRESTART=240       # Time interval to restart the model
+SWHR_GBL=1           # Time interval of shortwave radiation flux (default=6)
+LWHR_GBL=1           # Time interval of longwave  radiation flux
 #
 # Output of monthly averaged file
 #       24 : only daily average
@@ -168,14 +172,11 @@ export FILES_TO_BE_AVERAGED
 FCST_NPES=@NPES@
 #
 mkdir -p $EXPDIR 2>/dev/null
+#
 scrnam=`echo $0 | sed 's?.*/??g'`
 cp $0 $EXPDIR/0LOG.$scrnam
 cp @SRCS_DIR@/define.h $EXPDIR/0LOG.define.h
 ls -l @BIN_DIR@ >$EXPDIR/0LOG.bindates
-#
-# Environmental variables for thread mode
-#
-. @RUNSCR_DIR@/envset
 #
 #if [ $DDSS -gt 15 ] ; then
 #	LENMON=`expr $LENMON + 1`
@@ -228,17 +229,15 @@ while [ $YYYYSS -le $YYYYEND ] ; do
         mkdir -p $EXECDIR
         cd $EXECDIR || exit 8
 		#
+		# namelist
+		#
+		. @RUNSCR_DIR@/namelist $EXECDIR
+		#
 		# Forecast section
 		#
 		if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ];then
 			h=`@RUNSCR_DIR@/restart` || exit 8
 		else
-			#
-			# co2
-			#
-			if [ ! -s co2con ] ; then
-				@RUNSCR_DIR@/co2 || exit 8
-			fi
 			#
 			# mountain
 			#
@@ -255,32 +254,12 @@ while [ $YYYYSS -le $YYYYEND ] ; do
 			@RUNSCR_DIR@/fetchfile $initial_sfc ./initial_sfc_glb \
 				$INITIAL_SIG_PROTOCOL $INITIAL_SIG_PLATFORM || exit 8
 			#
-			# Conversion to binary
-			#
-			FILE_FORMAT=`echo $INITIAL_SIG | sed 's/.*\.//g'`
-			if [ "$FILE_FORMAT" != ascii -a \
-					"$FILE_FORMAT" != asc -a \
-					"$FILE_FORMAT" != ieee -a \
-					"$FILE_FORMAT" != ieee_dp -a \
-					"$FILE_FORMAT" != ieee_sgi -a \
-					"$FILE_FORMAT" != cray ] ; then
-				FILE_FORMAT=bin
-			fi
-			@ETC_DIR@/scnvrt gsm $INITIAL_SFC_FILE_TYPE \
-				@IJCAP@:@ILONF@:@ILATG@:@ILEVS@ \
-				-1:-1:-1:-1:-1 \
-				$FILE_FORMAT:bin initial_sig_glb:initial_sfc_glb \
-				initial_sig_bin:initial_sfc_bin || exit 8
-			#
 			# Change resolution
 			#
-			@RUNSCR_DIR@/chgr \
-					initial_sig_bin initial_sfc_bin \
-					sigit sfci \
-					$INITIAL_SFC_FILE_TYPE || exit 8
-			cp sigit sigitdt
+			export SDATE=$YMDH
+			@RUNSCR_DIR@/chgr initial_sig_glb || exit 8
+			cp sigit sigitdt  
 			cp sigit sig.ft00
-			cp sfci  sfc.ft00
 			#
 			h=00
 		fi
@@ -370,8 +349,8 @@ while [ $YYYYSS -le $YYYYEND ] ; do
 			if [ $h -eq 0 ] ;then
 				export SST_GRB_T0 SNO_GRB_T0 ICE_GRB_T0
         		export iicegrb0 isstgrb0 isnogrb0 ism2grb0
-				@RUNSCR_DIR@/sfc0 gsm sfci sfco $INITIAL_SFC_FILE_TYPE || exit 8
-				mv sfco sfci
+				@RUNSCR_DIR@/sfc0 gsm initial_sfc_glb || exit 8
+				cp sfci sfc.ft00
 			fi
 			#
 			# define ftp output choices (function of $hx)
@@ -409,18 +388,18 @@ while [ $YYYYSS -le $YYYYEND ] ; do
 		    export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
 		    export SWHR_GBL LWHR_GBL
 			@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+						$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	 		#
 	 		#  Execute forecast
 	 		#
-		    if [ "$BATCHQUE" = qsub ]; then
-   			     fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		    if [ "@BATCHQUE@" = qsub ]; then
+   			     fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
         		 log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
-		    elif [ "$BATCHQUE" = llsubmit ]; then
-   				 fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		    elif [ "@BATCHQUE@" = llsubmit ]; then
+   				 fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
 				 log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
-		    elif [ "$BATCHQUE" = bsub ]; then
-    		     fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+		    elif [ "@BATCHQUE@" = bsub ]; then
+    		     fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/fcst @BATCHsuffix@`
 		         fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
        			 log_name="fcst.e`echo $fcstid`"
 		    fi
@@ -430,23 +409,23 @@ while [ $YYYYSS -le $YYYYEND ] ; do
 			archive_dir=`eval echo $ARCHIVE_DIR`
 			archive_dir=$archive_dir/$YMDH
 			export YYYY MM DD HH h hx INTSFCX INTOMLX INTSFC ENDHOUR INCHOUR INTFLX INTSIG INTAVG archive_dir ARCHIVE_PLATFORM ARCHIVE_FTP_PROTOCOL LIST_OF_FILES FILES_TO_BE_KEPT FILES_TO BE AVERAGED
-			if [ "$BATCHQUE" != "" ]; then
-				if [ "$BATCHQUE" = llsubmit ]; then
-					@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
-					${BATCHQUE} @RUNSCR_DIR@/post_all
-		    	elif [ "$BATCHQUE" = bsub ]; then
-					postid=`${BATCHQUE} ${BATCHdepend}${fcstid} < @RUNSCR_DIR@/post_all @BATCHsuffix@`
-					@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+			if [ "@BATCHQUE@" != "" ]; then
+				if [ "@BATCHQUE@" = llsubmit ]; then
+					@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
+					@BATCHQUE@ @RUNSCR_DIR@/post_all
+		    	elif [ "@BATCHQUE@" = bsub ]; then
+					postid=`@BATCHQUE@ @BATCHdepend@${fcstid} < @RUNSCR_DIR@/post_all @BATCHsuffix@`
+					@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 					# wait for the last post_all execution
 					if [ $YYYYSS -eq $YYYYEND -a $nens -eq $NENS -a $hx -ge $ENDHOUR ] ; then
-						@RUNSCR_DIR@/wait_que_job $postid $log_name $BATCHstatus || exit 8
+						@RUNSCR_DIR@/wait_que_job $postid $log_name @BATCHstatus@ || exit 8
 					fi
 				else
-					postid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/post_all @BATCHsuffix@`
-					@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+					postid=`@BATCHQUE@ @BATCHdepend@${fcstid} @RUNSCR_DIR@/post_all @BATCHsuffix@`
+					@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 					# wait for the last post_all execution
 					if [ $YYYYSS -eq $YYYYEND -a $nens -eq $NENS -a $hx -ge $ENDHOUR ] ; then
-						@RUNSCR_DIR@/wait_que_job $postid $log_name $BATCHstatus || exit 8
+						@RUNSCR_DIR@/wait_que_job $postid $log_name @BATCHstatus@ || exit 8
 					fi
 				fi
 				@RUNSCR_DIR@/wait_sigit_update $hx  || exit 8
@@ -460,6 +439,9 @@ while [ $YYYYSS -le $YYYYEND ] ; do
 		#
 		nens=`expr $nens + 1`
 		@ETC_DIR@/incdte $YYYY $MM $DD $HH $INCENS >incdte.out$$ || exit 8
+		if [ "$RMOUTPUT" = yes ]; then
+			rm -rf $EXECDIR/pgb* $EXECDIR/fgb* $EXECDIR/mtn* $EXECDIR/top2m* $EXECDIR/riv* $EXECDIR/oro*
+		fi
 		read YYYY MM DD HH <incdte.out$$
 		rm incdte.out$$
 		YYYYS=$YYYY

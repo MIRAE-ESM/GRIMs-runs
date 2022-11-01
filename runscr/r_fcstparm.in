@@ -85,7 +85,11 @@ cat >>rfcst.parm <<EOF
  FNGRB(10)='clim.yhalbedo.grib   '
  FNGRB(13)='clim.sibrough.grib   '
  FNGRB(14)='clim.sibresis.grib   '
- FNGRB(18)='@VEG_FRAC@           '
+ FNGRB(18)='@VEG_FRAC@ '
+ FNGRB(25)='@VEG_LAI@            '
+ FNGRB(26)='@EMISSIVITY@         '
+ FNGRB(34)='clim.icetk.grib'
+ FNGRB(35)='${ICE_GRB:=@CON_DIR@/clim.ice.grib}'
 /
 EOF
 if [ $iicegrb -eq 1 ]; then

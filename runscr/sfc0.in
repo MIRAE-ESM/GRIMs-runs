@@ -1,4 +1,7 @@
 #!/bin/sh
+set -x
+#
+# make sfci
 #
 #  This script replaces specified field in the initial sfc file
 #  It is necessary to edit variables defined in the lines between 
@@ -9,24 +12,18 @@
 #  $1 .... gsm or rsm
 #  $2 .... input sfc file name
 #  $3 .... output sfc file name
-#  $4 .... input sfc file type [osu1,osu2,noa1,vic1]
 #
-set -x
-if [ $# -lt 4 ] ; then
+if [ $# -lt 2 ] ; then
 	echo $0: Argument error
 	echo '$1'=$1 
 	echo '$2'=$2 
-	echo '$3'=$3 
-	echo '$4'=$4 
 	exit 8
 fi
 #
 GSM0RSM=$1
 FNIN=$2
-FNOUT=$3
-SFCFTYPIN=$4
-if [ $# = 5 ]; then
-	FH=$5
+if [ $# = 3 ]; then
+	FH=$3
 else
 	FH=0
 fi
@@ -36,8 +33,6 @@ PROG=sfc0
 cat >${PROG}.parm <<EOF
  &NAMSFC0
  FNIN='$FNIN',
- FNOUT='$FNOUT',
- SFCFTYPIN='$SFCFTYPIN',
  FH=${FH}.
 /
 EOF
@@ -61,26 +56,12 @@ cat >>${PROG}.parm <<EOF
  FNMSKG='@CON_DIR@/clim.maskh.grib'
  CONDIR='@CON_DIR@'
  BINDIR='@BIN_DIR@'
- FNGRB(1)='clim.glacier.grib    '
- FNGRB(2)='clim.maxice.grib     '
  FNGRB(4)='${ICE_GRB_T0:=@CON_DIR@/clim.ice.grib}'
  FNGRB(5)='$SCV_GRB_T0'
  FNGRB(6)='${SNO_GRB_T0:=@CON_DIR@/clim.snow.grib}'
  FNGRB(7)='${SST_GRB_T0:=@CON_DIR@/clim.sst.grib}'
- FNGRB(8)='clim.yhalbedo.grib   '
- FNGRB(9)='clim.sibalbedo.grib  '
- FNGRB(10)='clim.yhalbedo.grib   '
- FNGRB(11)='$SM2_GRB_T0'
- FNGRB(13)='clim.sibrough.grib   '
- FNGRB(14)='clim.sibresis.grib   '
- FNGRB(15)='clim.tg3.grib        '
- FNGRB(18)='@VEG_FRAC@           '
- FNGRB(19)='@VEG_VTYP@           '
- FNGRB(20)='@VEG_STYP@           '
- FNGRB(21)='clim.slptyp.grib     '
- FNGRB(22)='clim.snoalb.grib     '
- FNGRB(23)='clim.shdmax.grib     '
- FNGRB(24)='clim.shdmin.grib     '
+ FNGRB(15)='$SM2_GRB_T0'
+ FNGRB(33)='${ICE_GRB_T0:=@CON_DIR@/clim.ice.grib}'
 EOF
 #
 if [ `echo ${iicegrb0:=0}` -eq 1 ]; then
@@ -123,22 +104,24 @@ else
     echo " lfgrb(5,7)=F" >> ${PROG}.parm
 fi
 if [ `echo ${ism2grb0:=0}` -eq 1 ]; then
-    echo " lfgrb(1,11)=F" >> ${PROG}.parm
-    echo " lfgrb(2,11)=T" >> ${PROG}.parm
-    echo " lfgrb(3,11)=F" >> ${PROG}.parm
-    echo " lfgrb(4,11)=T" >> ${PROG}.parm
-    echo " lfgrb(5,11)=F" >> ${PROG}.parm
+    echo " lfgrb(1,15)=F" >> ${PROG}.parm
+    echo " lfgrb(2,15)=T" >> ${PROG}.parm
+    echo " lfgrb(3,15)=F" >> ${PROG}.parm
+    echo " lfgrb(4,15)=T" >> ${PROG}.parm
+    echo " lfgrb(5,15)=F" >> ${PROG}.parm
 else
-    echo " lfgrb(1,11)=F" >> ${PROG}.parm
-    echo " lfgrb(2,11)=F" >> ${PROG}.parm
-    echo " lfgrb(3,11)=F" >> ${PROG}.parm
-    echo " lfgrb(4,11)=F" >> ${PROG}.parm
-    echo " lfgrb(5,11)=F" >> ${PROG}.parm
+    echo " lfgrb(1,15)=F" >> ${PROG}.parm
+    echo " lfgrb(2,15)=F" >> ${PROG}.parm
+    echo " lfgrb(3,15)=F" >> ${PROG}.parm
+    echo " lfgrb(4,15)=F" >> ${PROG}.parm
+    echo " lfgrb(5,15)=F" >> ${PROG}.parm
 fi
 echo '/' >> ${PROG}.parm
 #
 if [ @SYSTEM@ = dec ];then
    ulimit -s 1024000
+elif [ @SYSTEM@ = mac_gnu ]; then
+   ulimit -s hard
 else
    ulimit -s unlimited
 fi
@@ -155,15 +138,14 @@ if [ @SYSTEM@ = x1e ] ; then
 	assign -R
 elif [ @SYSTEM@ = cray -o @SYSTEM@ = t90 -o @SYSTEM@ = t3e ] ; then
 	assign -R
-else
-	rm -f @FTNID@[0-9]* 2>/dev/null
 fi
-@FTASS@ ${PROG}.parm                    @FTNID@95
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@    @FTNID@1
 #
-unset OMP_NUM_THREADS
-@RUNENV@ ./$PROG.x 1>$PROG.out 2>&1
-export OMP_NUM_THREADS=@NTHREADS@
+if [ @INSTITUTION@ = haenam ]; then
+	aprun -n 1 ./$PROG.x 1>$PROG.out 2>&1  ||  exit 8
+else
+	@RUNENV@ ./$PROG.x 1>$PROG.out 2>&1  ||  exit 8
+fi
+rm -f $PROG.x
 if [ $? -ne 0 ] ; then
 	echo "`date` $0: Execution failed." >>ERROR.out
 	exit 8

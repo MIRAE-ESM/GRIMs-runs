@@ -59,6 +59,7 @@ INTOMLX=24
 INTSIG=$INT_CYCLE
 INTSFC=$INT_CYCLE
 INTFLX=$INT_CYCLE
+INTNCO=$INT_CYCLE       # Time interavl to create nc output file
 INTRESTART=24
 #
 fgb_post=1
@@ -87,8 +88,6 @@ YYYY=$YYYYS
 MM=$MMS
 DD=$DDS
 HH=$HHS
-#
-. $RUNS_DIR/runscr/envset
 #
 yyyymmddhhs=$YYYYS$MMS$DDS$HHS
 yyyymmddhhf=$YYYYF$MMF$DDF$HHF
@@ -158,6 +157,7 @@ echo '==============' >>ERROR.out
 		ENDHOUR=120
 		INTSIG=12
 		INTFLX=12
+		INTNCO=12
 	fi
 	else
 		ENDHOUR=6
@@ -183,7 +183,7 @@ echo '==============' >>ERROR.out
 	#  18.  fcst
 	#
                 $RUN_DIR/runscr/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-                      $INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+                      $INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
     #
     #  Execute forecast
     #

@@ -1,0 +1,5 @@
+#!/bin/sh
+#PBS -V
+#PBS -l select=@NNODES@:ncpus=@NCPU_PER_NODE@
+#PBS -q normal@nuri
+#PBS -j eo

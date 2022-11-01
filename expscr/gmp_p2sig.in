@@ -4,29 +4,48 @@ set -ax
 #-------------------------------------------------------------------------------
 # 
 # This script makes initial (and boundary) input files for GMP (or RMP) from
-# grib formate reanalysis or GCM dataset.
+# grib1 format reanalysis or GCM dataset.
 #
-# data for default run in libs directory (../libs/con) are downloaded from
-# following directories in ncep ftp server (nomad2.ncep.noaa.gov)
-# 
-# /pub/raid1/reanalyses/reanalysis-2/6hr/sfcanl
-# /pub/raid1/reanalyses/reanalysis-2/6hr/sig
+# [history] 
+#
+# 2016. 01. 15.		Myung-Seo Koo			clean-up, UM initial data
+# 					Jihyeon Jang
+#
+# [variables]
+#
+# ifmoisrh : = 0 for specific humidity       ; = 1 for relative humidity  ifheight=1
+# ifheight : = 0 for geopotential (m**2/s**2); = 1 for height (m)
+# iupd5    : grib index for u wind
+# ivpd5    : grib index for v wind
+# itpd5    : grib index for temperature
+# iqpd5    : grib index for specific humidity(51) or relative humidity(52) 
+# izpd5    : grib index for geopotential (or height)
+# ifmtngrb : = 1 mtn data will be replaced by the grib file (fnmtngrb)
+# kdimq    : = 0 for all data level         ; = # for moisture variable level
+# ifcubic  : = 0 for linear interpolation   ; = 1 for cubic spline
+# stdprs   : pressure levels
 #
 #-------------------------------------------------------------------------------
 #
-# ----------------------  User changeable parameters  --------------------------
+# type of pressure grib data (UM/FNL/R2/ECMWF/ECHAM/HG2/JRA-55)
 #
-#-------------------------------------------------------------------------------
+PRS_TYPE=JRA-55
 #
-PRS_TYPE=ECMWF                                       # =FNL, R2, ECMWF, ECHAM, HG2
+# pressure grib-file directory (GV=1 or 2; grib version)
 #
-PRSDIR=/home/mskoo/GRIMs/20140325/ECMWF_PRS          # pressure file directory
-INITIAL_SFC_FILE=/home/mskoo/GRIMs/20140325/libs/con/sfc.anl.\$SYYYYMMDDHH.ieee #R2
+PRSDIR=/home/mskoo/GRIMs/grimsini/jra/JRA-55
+GV=1
+#
+# surface ieee-file directory (gfs/r2)
+#
+SFCDIR=/data/DATABASE/ANALYSIS/GFS/gfs_sig
+#sfctype=gfs        # gfs or r2
+sfctype=none
 #
 # start & ending date
 #
-SYYYYMMDDHH=2001071400
-EYYYYMMDDHH=2001071400
+SYYYYMMDDHH=2001011500
+EYYYYMMDDHH=$SYYYYMMDDHH
 #
 #-------------------------------------------------------------------------------
 #
@@ -36,73 +55,114 @@ EYYYYMMDDHH=2001071400
 #
 # make directory & set resolution
 #
-OUTNAME=${PRS_TYPE}_sig
+OUTNAME=${PRS_TYPE}_initial_data
 execdir=@PWD@/$OUTNAME; export execdir
 mkdir -p $execdir 2>/dev/null
 cd $execdir
 #
-# p2sig setup
+# namelist
 #
+. @RUNSCR_DIR@/namelist $execdir
+#
+# variable setup
+#
+ijcap=1536   ### gfs
+ilevs=64     ### gfs
 if [ $PRS_TYPE = R2 ]; then
-  ifmoisrh=1  ### = 0 for specific humidity       , = 1 for relative humidity
-  ifheight=1  ### = 0 for geopotential (m**2/s**2), = 1 for height (m)
-  iupd5=33    ### grib index for u wind
-  ivpd5=34    ### grib index for v wind
-  itpd5=11    ### grib index for temperature
-  iqpd5=52    ### grib index for specific humidity(51) or relative humidity(52) 
-  izpd5=7     ### grib index for geopotential (or height)
-  ifmtngrb=0  ### = 1 mtn data will be replaced by the grib file (fnmtngrb)
-  kdimq=0     ### = 0 for all data level, = # for moisture variable level
-  ifcubic=0   ### = 0 for linear interpolation, = 1 for cubic spline
-  stdprs="1000.,925.,850.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+	ifmoisrh=1
+	ifheight=1
+	iupd5=33
+	ivpd5=34
+	itpd5=11
+	iqpd5=52
+	izpd5=7
+	ifmtngrb=0
+	kdimq=0
+	ifcubic=0
+	stdprs="1000.,925.,850.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+elif [ $PRS_TYPE = JRA-55 ]; then
+	ifmoisrh=0
+	ifheight=1
+	iupd5=33
+	ivpd5=34
+	itpd5=11
+	iqpd5=51
+	izpd5=7
+	ifmtngrb=0
+	kdimq=27
+	ifcubic=0
+	stdprs="1000.,975.,950.,925.,900.,875.,850.,825.,800.,775.,750.,700.,650.,600.,550.,500.,450.,400.,350.,300.,250.,225.,200.,175.,150.,125.,100.,70.,50.,30.,20.,10.,7.,5.,3.,2.,1."
 elif [ $PRS_TYPE = FNL ]; then
-  ifmoisrh=1  ### = 0 for specific humidity       , = 1 for relative humidity
-  ifheight=1  ### = 0 for geopotential (m**2/s**2), = 1 for height (m)
-  iupd5=33    ### grib index for u wind
-  ivpd5=34    ### grib index for v wind
-  itpd5=11    ### grib index for temperature
-  iqpd5=52    ### grib index for specific humidity(51) or relative humidity(52) 
-  izpd5=7     ### grib index for geopotential (or height)
-  ifmtngrb=0  ### = 1 mtn data will be replaced by the grib file (fnmtngrb)
-  kdimq=21    ### = 0 for all data level, = # for moisture variable level
-  ifcubic=0   ### = 0 for linear interpolation, = 1 for cubic spline
-  stdprs="1000.,975.,950.,925.,900.,850.,800.,750.,700.,650.,600.,550.,500.,450.,400.,350.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+	ifmoisrh=1
+	ifheight=1
+	iupd5=33
+	ivpd5=34
+	itpd5=11
+	iqpd5=52
+	izpd5=7
+	ifmtngrb=0
+	kdimq=21
+	ifcubic=0
+	stdprs="1000.,975.,950.,925.,900.,850.,800.,750.,700.,650.,600.,550.,500.,450.,400.,350.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+elif [ $PRS_TYPE = UM ]; then
+	ifmoisrh=1
+	ifheight=1
+	iupd5=33
+	ivpd5=34
+	itpd5=11
+	iqpd5=52
+	izpd5=7
+	ifmtngrb=0
+	kdimq=19
+	ifcubic=1
+	stdprs="1000.,950.,925.,850.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,15.,10.,7.,5.,3.,2.,1."
+	ijcap=512
+	ilevs=24
 elif [ $PRS_TYPE = ECMWF ]; then
-  ifmoisrh=0  ### = 0 for specific humidity       , = 1 for relative humidity
-  ifheight=0  ### = 0 for geopotential (m**2/s**2), = 1 for height (m)
-  iupd5=131   ### grib index for u wind
-  ivpd5=132   ### grib index for v wind
-  itpd5=130   ### grib index for temperature
-  iqpd5=133   ### grib index for specific humidity(133) or relative humidity(157)
-  izpd5=129   ### grib index for geopotential (or height)
-  ifmtngrb=0  ### = 1 mtn data will be replaced by the grib file (fnmtngrb)
-  kdimq=0     ### = 0 for all data level, = # for moisture variable level
-  ifcubic=0   ### = 0 for linear interpolation, = 1 for cubic spline
-  stdprs="1000.,975.,950.,925.,900.,875.,850.,825.,800.,775.,750.,700.,650.,600.,550.,500.,450.,400.,350.,300.,250.,225.,200.,175.,150.,125.,100.,70.,50.,30.,20.,10.,7.,5.,3.,2.,1."
+	ifmoisrh=0
+	ifheight=0
+	iupd5=131
+	ivpd5=132
+	itpd5=130
+	iqpd5=133
+	izpd5=129
+	ifmtngrb=0
+	kdimq=0
+	ifcubic=0
+	stdprs="1000.,975.,950.,925.,900.,875.,850.,825.,800.,775.,750.,700.,650.,600.,550.,500.,450.,400.,350.,300.,250.,225.,200.,175.,150.,125.,100.,70.,50.,30.,20.,10.,7.,5.,3.,2.,1."
 elif [ $PRS_TYPE = ECHAM ]; then
-  ifmoisrh=0  ### = 0 for specific humidity       , = 1 for relative humidity
-  ifheight=1  ### = 0 for geopotential (m**2/s**2), = 1 for height (m)
-  iupd5=131   ### grib index for u wind
-  ivpd5=132   ### grib index for v wind
-  itpd5=130   ### grib index for temperature
-  iqpd5=133   ### grib index for specific humidity(51) or relative humidity(52) 
-  izpd5=156   ### grib index for geopotential (or height)
-  ifmtngrb=1  ### = 1 mtn data will be replaced by the grib file (fnmtngrb)
-  kdimq=0     ### = 0 for all data level, = # for moisture variable level
-  ifcubic=0   ### = 0 for linear interpolation, = 1 for cubic spline
-  stdprs="1000.,925.,850.,775.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+	ifmoisrh=0
+	ifheight=1
+	iupd5=131
+	ivpd5=132
+	itpd5=130
+	iqpd5=133
+	izpd5=156
+	ifmtngrb=1
+	kdimq=0
+	ifcubic=0
+	stdprs="1000.,925.,850.,775.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
 elif [ $PRS_TYPE = HG2 ]; then
-  ifmoisrh=0  ### = 0 for specific humidity       , = 1 for relative humidity
-  ifheight=1  ### = 0 for geopotential (m**2/s**2), = 1 for height (m)
-  iupd5=33    ### grib index for u wind
-  ivpd5=34    ### grib index for v wind
-  itpd5=11    ### grib index for temperature
-  iqpd5=51    ### grib index for specific humidity(51) or relative humidity(52) 
-  izpd5=7     ### grib index for geopotential (or height)
-  ifmtngrb=0  ### = 1 mtn data will be replaced by the grib file (fnmtngrb)
-  kdimq=0     ### = 0 for all data level, = # for moisture variable level
-  ifcubic=0   ### = 0 for linear interpolation, = 1 for cubic spline
-  stdprs="1000.,925.,850.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+	ifmoisrh=0
+	ifheight=1
+	iupd5=33
+	ivpd5=34
+	itpd5=11
+	iqpd5=51
+	izpd5=7
+	ifmtngrb=0
+	kdimq=0
+	ifcubic=0
+	stdprs="1000.,925.,850.,700.,600.,500.,400.,300.,250.,200.,150.,100.,70.,50.,30.,20.,10."
+fi
+if [ $sfctype == r2 ]; then
+	styp=osu1
+	ilonf=192
+	ilatg=94
+elif [ $sfctype == gfs ]; then
+	styp=noa1
+	ilonf=3072
+	ilatg=1536
 fi
 #-------------------------------------------------------------------------------
 #
@@ -111,70 +171,104 @@ fi
 #-------------------------------------------------------------------------------
 YYYYMMDDHH=$SYYYYMMDDHH
 while [ $YYYYMMDDHH -le $EYYYYMMDDHH ]; do
-   YYYY=`echo $YYYYMMDDHH | cut -c1-4`
-   YY=`echo $YYYYMMDDHH | cut -c3-4`
-   MM=`echo $YYYYMMDDHH | cut -c5-6`
-   DD=`echo $YYYYMMDDHH | cut -c7-8`
-   HH=`echo $YYYYMMDDHH | cut -c9-10`
-   #
-   if [ ${PRS_TYPE} = R2 ]; then
-     prs_file=$PRSDIR/pgb.$YYYY$MM
-   elif [ ${PRS_TYPE} = FNL ]; then
-     prs_file=$PRSDIR/fnl_${YYYY}${MM}${DD}_${HH}_00
-   elif [ ${PRS_TYPE} = HG2 ]; then
-     prs_file=$PRSDIR/HG2.${YYYY}${MM}${DD}${HH}.grb
-   elif [ ${PRS_TYPE} = ECMWF ]; then
-     prs_file=$PRSDIR/pre.anal.${YYYY}${MM}${DD}${HH}
-   fi
-   sig_file=sig.anl.$YYYYMMDDHH.ieee
-   sfc_file=sfc.anl.$YYYYMMDDHH.ieee
-   #
-   fnmtngrb=$prs_file
-   #
-   # Conversion ieee to binary format for SFC file
-   #
-   sfcf=`eval echo $INITIAL_SFC_FILE`
-   @ETC_DIR@/scnvrt gsm osu1 \
-                    @IJCAP@:@ILONF@:@ILATG@:@ILEVS@  -1:-1:-1:-1:-1 ieee:bin \
-                    dummy:$sfcf dummy:cnvrt_initial_sfc || exit 8
-   #
-   # mountain
-   #
-   if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
-	@RUNSCR_DIR@/mtn || exit 8
-   fi
-   #
-   # Change resolution for SFC file
-   #
-   @RUNSCR_DIR@/chgr dummy cnvrt_initial_sfc dummy sfci osu1 || exit 8
-   #
-   # Conversion from pressure-grib to sigma format (binary)
-   #
-   @RUNSCR_DIR@/p2sig $prs_file cnvrt_initial_sig \
-                      ${YYYYMMDDHH}00 $ifmoisrh $ifheight \
-                      $iupd5:$ivpd5:$itpd5:$iqpd5:$izpd5:$ifmtngrb:$kdimq:$ifcubic $stdprs \
-                      sfci $fnmtngrb || exit 8
-   #
-   # Conversion binary to ieee format for SIG file
-   #
-   if [ @JCAP@ -eq 62 ];then
-     LONF=192
-     LATG=94
-   elif [ @JCAP@ -eq 126 ];then
-     LONF=384
-     LATG=192
-   elif [ @JCAP@ -eq 254 ];then
-     LONF=768
-     LATG=384
-   elif [ @JCAP@ -eq 510 ];then
-     LONF=1536
-     LATG=768
-   fi
-   @ETC_DIR@/scnvrt gsm osu1 \
-                    @JCAP@:$LONF:$LATG:@LEVS@  -1:-1:-1:-1:-1 bin:ieee \
-                    cnvrt_initial_sig:sfci $sig_file:$sfc_file || exit 8
-   YYYYMMDDHH=`@ETC_DIR@/validate.s $YYYYMMDDHH 6`
+	YYYY=`echo $YYYYMMDDHH | cut -c1-4`
+	YY=`echo $YYYYMMDDHH | cut -c3-4`
+	MM=`echo $YYYYMMDDHH | cut -c5-6`
+	DD=`echo $YYYYMMDDHH | cut -c7-8`
+	HH=`echo $YYYYMMDDHH | cut -c9-10`
+	#
+	# input pressure file
+	#
+	if [ ${PRS_TYPE} = R2 ]; then
+		ipfile=$PRSDIR/pgb.$YYYY$MM
+	elif [ ${PRS_TYPE} = JRA-55 ]; then
+		ipfile=$PRSDIR/${YYYY}${MM}${DD}${HH}.grib
+	elif [ ${PRS_TYPE} = FNL ]; then
+		ipfile=$PRSDIR/fnl_${YYYY}${MM}${DD}_${HH}_00
+	elif [ ${PRS_TYPE} = HG2 ]; then
+		ipfile=$PRSDIR/HG2.${YYYY}${MM}${DD}${HH}.grb
+	elif [ ${PRS_TYPE} = UM ]; then
+		ipfile=$PRSDIR/${YYYY}/${MM}/g512_v070_ergl_pres_h000.${YYYYMMDDHH}.gb2
+		if [ ! -s ${ipfile} ]; then
+			ipfile=$PRSDIR/${YYYY}/${MM}/g768_v070_ergl_pres_h000.${YYYYMMDDHH}.gb2
+		fi
+	elif [ ${PRS_TYPE} = ECMWF ]; then
+		ipfile=$PRSDIR/pre.anal.${YYYY}${MM}${DD}${HH}
+	fi
+	#
+	# grib2 to grib1
+	#
+    if [ $GV -eq 2 ]; then
+        @ETC_DIR@/cnvgrib -g21 ${ipfile} prs.grib1 ||  exit 8
+		ipfile=prs.grib1
+	fi
+	#
+	# input surface file
+	#
+	isfile=$SFCDIR/$YYYY/$MM/gfs.$YYYYMMDDHH/gfs.t${HH}z.sfcanl
+	#
+	# output sig/sfc files
+	#
+	sig_file=sig.anl.$YYYYMMDDHH.ieee
+	sfc_file=sfc.anl.$YYYYMMDDHH.ieee
+	#
+	fnmtngrb=$ipfile
+	#
+	# Conversion ieee to binary format for SFC file
+	#
+	sfcf=`eval echo $isfile`
+	if [ $sfctype == gfs ] ; then
+		@ETC_DIR@/scnvrt_gfs gsm $styp \
+					$ijcap:$ilonf:$ilatg:$ilevs  -1:-1:-1:-1:-1 ieee:bin \
+					dummy:$sfcf dummy:cnvrt_initial_sfc || exit 8
+	elif [ $sfctype == r2 ]; then
+		@ETC_DIR@/scnvrt gsm $styp \
+					$ijcap:$ilonf:$ilatg:$ilevs  -1:-1:-1:-1:-1 ieee:bin \
+					dummy:$sfcf dummy:cnvrt_initial_sfc || exit 8
+	fi
+	#
+	# mountain
+	#
+	if [ ! -s slmsk  -o ! -s oroggd -o ! -s mtnvar ] ; then
+		@RUNSCR_DIR@/mtn || exit 8
+	fi
+	#
+	# Change resolution for SFC file
+	#
+	if [ $sfctype = ra2 -o $sfctype = gfs ]; then
+		@RUNSCR_DIR@/chgr dummy cnvrt_initial_sfc dummy sfci $styp || exit 8
+	fi
+	#
+	# Conversion from pressure-grib to sigma format (binary)
+	#
+	@RUNSCR_DIR@/p2sig $ipfile cnvrt_initial_sig \
+						${YYYYMMDDHH}00 $ifmoisrh $ifheight \
+						$iupd5:$ivpd5:$itpd5:$iqpd5:$izpd5:$ifmtngrb:$kdimq:$ifcubic $stdprs \
+						sfci $fnmtngrb || exit 8
+	#
+	# Conversion binary to ieee format for SIG file
+	#
+	if [ @JCAP@ -eq 62 ];then
+		LONF=192
+		LATG=94
+	elif [ @JCAP@ -eq 126 ];then
+		LONF=384
+		LATG=192
+	elif [ @JCAP@ -eq 254 ];then
+		LONF=768
+		LATG=384
+	elif [ @JCAP@ -eq 510 ];then
+		LONF=1536
+		LATG=768
+	fi
+	@ETC_DIR@/scnvrt gsm $styp \
+		@JCAP@:$LONF:$LATG:@LEVS@  -1:-1:-1:-1:-1 bin:ieee \
+		cnvrt_initial_sig:sfci $sig_file:$sfc_file || exit 8
+	YYYYMMDDHH=`@ETC_DIR@/validate.s $YYYYMMDDHH 6`
 done
 #
-rm -f fort.* *.parm cnvrt_* *.x sfci
+# remove
+#
+rm -f fort.* *.parm cnvrt_* *.x sfci top4m*asc scnvrt*.data oro* mtnvar slmsk ERROR.out mtn.ctl
+rm -f *.out
 #

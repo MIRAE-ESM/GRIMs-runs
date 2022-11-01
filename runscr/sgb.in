@@ -39,21 +39,25 @@ if [ @SYSTEM@ = cray -o @SYSTEM@ = t90 -o @SYSTEM@ = t3e ] ; then
 	assign -R
 fi
 rm -f $PROG.x
-@FTASS@ @BIN_DIR@/$PROG.x             $PROG.x
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@  fort.1
-ulimit -s unlimited
-ulimit -c unlimited
-unset OMP_NUM_THREADS
+#
+@FTASS@ @BIN_DIR@/$PROG.x $PROG.x
+if [ @SYSTEM@ = mac_gnu ]; then
+	ulimit -s hard
+	ulimit -c unlimited
+else
+	ulimit -s unlimited
+	ulimit -c unlimited
+fi
 @RUNENV@ ./$PROG.x <$PROG.parm 1>$PROG.out 2>&1
-export OMP_NUM_THREADS=@NTHREADS@
+#
 if [ $? -ne 0 ] ; then
 	echo "`date` $0: Execution failed." >>ERROR.out
 	exit 8
+fi
 #
 # make ctl
 #
 @RUNSCR_DIR@/makectl sgb
 #
-fi
 rm -f filenv.$$ >/dev/null
 exit 0

@@ -178,10 +178,6 @@ export iicegrb isnogrb isstgrb ism2grb
 #
 FCST_NPES=@NPES@
 #
-#   Environmental variables
-#
-. @RUNSCR_DIR@/envset 
-#
 scrnam=`echo $0 | sed 's?.*/??g'`
 cp $0 $EXECDIR/0LOG.$scrnam
 cp @RUNSCR_DIR@/../namelist.$scrnam $EXECDIR/0LOG.namelist.$scrnam
@@ -237,12 +233,6 @@ if [ -s r_sigit -a -s r_sigitdt -a -s r_sfci -a $FCST_RESTART = yes ] ; then
 else
 	#
 	#  cold start
-	#
-	# co2
-	#
-	if [ ! -s co2con ] ; then
-	      @RUNSCR_DIR@/co2 || exit 8
-	fi
 	#
 	#  Regional mountain (r_mtn)
 	#
@@ -393,19 +383,19 @@ while [ $h -lt $ENDHOUR ];do
 	inchour=$INCHOUR
 	prthour=$INTPOST
 	export h hx inchour prthour
-	if [ "$BATCHQUE" = qsub ]; then
-		fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+	if [ "@BATCHQUE@" = qsub ]; then
+		fcstid=`@BATCHQUE@ @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
 		log_name="r_fcst.e`echo $fcstid | cut -d'.' -f1`"
-	elif [ "$BATCHQUE" = llsubmit ]; then
-		fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+	elif [ "@BATCHQUE@" = llsubmit ]; then
+		fcstid=`@BATCHQUE@ @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
 		log_name="r_fcst.e`echo $fcstid | cut -d'.' -f2`"
-	elif [ "$BATCHQUE" = bsub ]; then
-		fcstid0=`$BATCHQUE < @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+	elif [ "@BATCHQUE@" = bsub ]; then
+		fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
 		fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
 		log_name="fcst.e`echo $fcstid`"
 	fi
-	if [ "$BATCHQUE" != "" ]; then
-		@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+	if [ "@BATCHQUE@" != "" ]; then
+		@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 	fi
 	#
 	#  copy files for next forecast segment

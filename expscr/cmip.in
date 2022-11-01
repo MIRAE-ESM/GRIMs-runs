@@ -114,6 +114,7 @@ INTSFCX=24
 INTSIG=6
 INTSFC=6
 INTFLX=6
+INTNCO=6                # Time interavl to create nc output file
 INTRESTART=24
 INCHOUR=24
 NESTING_HOUR=6
@@ -192,10 +193,6 @@ ls -l @BIN_DIR@ >$EXPDIR/0LOG.bindates
 mkdir -p $EXPDIR/sst
 cp $SST_ANL_T0 $EXPDIR/sst
 #
-# Environmental variables for thread mode
-#
-. @RUNSCR_DIR@/envset
-#
 # save INCHOUR and INTRESTART for modification
 #
 inchour_orig=$INCHOUR
@@ -248,12 +245,6 @@ while [ $YYYYS -le $YYYYEND ] ; do
 	 if [ -s sigit -a -s sigitdt -a -s sfci -a "$FCST_RESTART" = yes ] ; then
 	 	  h=`@RUNSCR_DIR@/restart` || exit 8
 	 else
-         #
-         # co2
-         #
-         if [ ! -s co2con ] ; then
-            @RUNSCR_DIR@/co2 || exit 8
-         fi
          #
          # mtn
          #
@@ -485,18 +476,18 @@ while [ $YYYYS -le $YYYYEND ] ; do
       export SST_GRB SNO_GRB ICE_GRB
       export iicegrb isstgrb isnogrb ism2grb
       @RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX \
-              $INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+              $INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	 		#
 	 		#  Execute forecast
 	 		#
-  		    if [ "$BATCHQUE" = qsub ]; then
-  		        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+  		    if [ "@BATCHQUE@" = qsub ]; then
+  		        fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
   		        log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
-  		    elif [ "$BATCHQUE" = llsubmit ]; then
-   		        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+  		    elif [ "@BATCHQUE@" = llsubmit ]; then
+   		        fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
   				log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
-  			elif [ "$BATCHQUE" = bsub ]; then
-     		     fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+  			elif [ "@BATCHQUE@" = bsub ]; then
+     		     fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/fcst @BATCHsuffix@`
    	     	  fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
    	    	   log_name="fcst.e`echo $fcstid`"
 			fi
@@ -512,7 +503,7 @@ while [ $YYYYS -le $YYYYEND ] ; do
                 log_name_postall=post.e`echo $postid | cut -d'.' -f1`
         		@RUNSCR_DIR@/wait_que_job $fcstid $log_name_fcst || exit 8
 			elif [ "@BATCHQUE@" = bsub ]; then
-				postid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})"
+				postid=`@BATCHQUE@ @BATCHdepend@ "done(${fcstid})"
 					-v YYYY=$YYYY,MM=$MM,DD=$DD,HH=$HH,h=$h,hx=$hx,INTSFCX=$INTSFCX,INTSFC=$INTSFC,ENDHOUR=$ENDHOUR,INCHOUR=$INCHOUR,INTFLX=$INTFLX,INTSIG=$INTSIG,INTAVG=$INTAVG,archive_dir=$archive_dir,ARCHIVE_PLATFORM=$ARCHIVE_PLATFORM,ARCHIVE_FTP_PROTOCOL=$ARCHIVE_FTP_PROTOCOL,LIST_OF_FILES="$LIST_OF_FILES",FILES_TO_BE_KEPT="$FILES_TO_BE_KEPT",FILES_TO_BE_AVERAGED="$FILES_TO_BE_AVERAGED" @RUNSCR_DIR@/post_all`
             log_name_postall=post.e`echo $postid | cut -d'.' -f1`
         		@RUNSCR_DIR@/wait_que_job $fcstid $log_name_fcst || exit 8

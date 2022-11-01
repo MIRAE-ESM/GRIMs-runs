@@ -90,7 +90,6 @@ if [ @SYSTEM@ = cray -o @SYSTEM@ = t90 ] ; then
 	assign -R
 fi
 @FTASS@ $OUTRSIG                          @FTNID@51
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@      @FTNID@1
 #
 if [ @SYSTEM@ = dec ]; then
   ulimit -s 1024000

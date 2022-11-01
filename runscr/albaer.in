@@ -1,11 +1,11 @@
 #!/bin/sh
+set -x
 #
 # @ job_type = serial
 # @ output = albaer.out.$(jobid).out
 # @ error = albaer.out.$(jobid).err
 # @ queue
-
-set -x
+#
 FTNID=@FTNID@
 FTASS='@FTASS@'
 CON_DIR=@CON_DIR@
@@ -54,7 +54,6 @@ else
 		rm -f ${FTNID}11 2>/dev/null
 fi
 ${FTASS} $CON_DIR/mdlv1e.asc          ${FTNID}11
-${FTASS} @RUNS_DIR@/namelist.@SCRIPT@ ${FTNID}1
 $BIN_DIR/$PROG.x <$PROG.parm 1>$PROG.out 2>&1
 if [ $? -ne 0 ] ; then
 	echo error in $PROG.x

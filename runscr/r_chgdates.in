@@ -1,3 +1,4 @@
+#!/bin/sh
 if [ $# -ne 3 ] ; then
 	echo 'Usage: chgdates newyr:newmo:newdy:newhr:fhnew isig:isfc osig:osfc'
 	echo "`date` $0: Wrong usage" >>ERROR.out
@@ -41,7 +42,6 @@ fi
 @FTASS@ $isfc @FTNID@12
 @FTASS@ $osig @FTNID@51
 @FTASS@ $osfc @FTNID@52
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@  @FTNID@1
 
 echo ' &NAMIN' >$PROG.parm
 echo " NEWYR=$newyr,NEWMO=$newmo,NEWDY=$newdy,NEWHR=$newhr," >>$PROG.parm

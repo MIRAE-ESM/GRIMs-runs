@@ -73,6 +73,7 @@ INTOMLX=$INT_CYCLE
 INTSIG=$INT_CYCLE
 INTSFC=$INT_CYCLE
 INTFLX=$INT_CYCLE
+INTNCO=$INT_CYCLE
 INTRESTART=24
 #
 fgb_post=1
@@ -113,7 +114,6 @@ MM=$MMS
 DD=$DDS
 HH=$HHS
 #
-. @RUNSCR_DIR@/envset
 machine=`cat @ETC_DIR@/../machine.h | cut -d' ' -f2 | tr '[A-Z]' '[a-z]'`
 #
 yyyymmddhhs=$YYYYS$MMS$DDS$HHS
@@ -355,7 +355,7 @@ while [ $yyyymmddhh -le $yyyymmddhhf ] ; do
 	if [ $restart_step -le 18 ] ; then
 		/bin/rm -f sigit sfci
 		@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-                      $INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+                      $INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 		@RUNSCR_DIR@/cnv4dig sig.anl sfc.anl sigit sfci $SFCFTYP $century || exit 8
 		cp sigit sigitdt
 		cp sigit sig.anl

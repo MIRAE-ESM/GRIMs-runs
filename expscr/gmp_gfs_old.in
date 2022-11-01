@@ -14,8 +14,8 @@ RUNNAME=                # Experimental name
 # Intervals of sfc execution, sigma output, sfc output and flx output
 # Various options for running the model
 #
-SDATE=2011072512        # Starting forecast date
-ENDHOUR=`expr 24 \* 10`  # Length of model integration in hour
+SDATE=${SDATE:=2012022800}  # Starting forecast date
+ENDHOUR=`expr 24 \* 3`  # Length of model integration in hour
 INTPOST=$ENDHOUR        # Time interval to create output files for the first execution
 INCHOUR=$INTPOST        # Forecast hour for the first execution
 INTSFCX=10000000        # Time interval to run surface merging
@@ -23,15 +23,21 @@ INTOMLX=24              # Time interval to run ocean mixed layer model
 INTSIG=6                # Time interval to create sigma output file
 INTSFC=$INTSIG          # Time interval to create surface output file
 INTFLX=$INTSFC          # Time interval to create surface flux output file
+INTNCO=$INTSIG          # Time interavl to create nc output file
 INTSIG2=6               # Time interval to create sigma output file after first execution
 INTSFC2=$INTSIG2        # Time interval to create surface output file after first execution
 INTFLX2=$INTSFC2        # Time interval to create surface flux output file after first execution
+INTNCO2=$INTSIG2        # Time interavl to create nc output file
 INTRESTART=$ENDHOUR     # Time interval to restart the model
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=3              # Time interval of longwave  radiation flux
+LWHR_GBL=1              # Time interval of longwave  radiation flux
 #
-DEL_FLUX=yes            # Option deleting flux file after forecst (yes;no)
 FCST_RESTART=yes        # Option indicating whether current forecast is first
+DEL_FLUX=yes            # Option deleting flux file after forecst (yes;no)
+SIG_GRIB=no             # Option gribing at sigma layer after forecst (yes;no)
+POST_SFC=no             # Option post-processing for surface (yes;no or resol.)
+DEL_BINARY=no           # Option deleting binary output after POST_SFC (yes;no)
+#
 SFC_FCST=no             # Option using surface fcst data
 SFC_ASSI_HOUR=12        # Time interval of surface fcst data
 #
@@ -50,14 +56,14 @@ if [ -z $RUNNAME ]; then
 else 
 	EXECDIR=@OUTPUT_DIR@/$RUNNAME
 fi
-export EXECDIR
+export EXECDIR SDATE
 #
 # -------------  do not change below  ------------------------------------------
 #
 mkdir -p $EXECDIR 2>/dev/null
 #
-INPUTDIR=/data/DATABASE/ANALYSIS/GFS/gfs_sig/${SYEAR}/${SMON}/gfs.${SDATE}      # Directory for GFS analysis data 
-SFCDIR=/data/DATABASE/ANALYSIS/GFS/gfs_sig/${SYEAR}/${SMON}/gfs.${SDATE}        # Directory for sst, sno, ice data
+INPUTDIR=/data6/msk/GFS/GFS/gfs.${SDATE}                # Directory for GFS analysis data 
+SFCDIR=/data3/bbk/obs/${SYYYYMMDD}                      # Directory for sst, sno, ice data
 FHOUR=`expr $SFC_ASSI_HOUR \* -1`
 FDATE=`@ETC_DIR@/validate.s ${SDATE} ${FHOUR}`
 FCSTDIR=@OUTPUT_DIR@/${FDATE}
@@ -94,10 +100,6 @@ INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
 FCST_NPES=@NPES@
 FCST_NCPUS=@NCPUS@
 #
-# set environmental variables
-#
-. @RUNSCR_DIR@/envset
-#
 # cd to run directory
 #
 scrnam=`echo $0 | sed 's?.*/??g'`
@@ -121,12 +123,6 @@ if [ @BARO_TEST@ != 1 ]; then
 		h=`@ETC_DIR@/fhour sigit`
 		echo fhour in the sigit file = $h
 	else
-		#
-		# co2
-		#
-		if [ ! -s co2con ] ; then
-			@RUNSCR_DIR@/co2 || exit 8
-		fi
 		#
 		# mountain
 		#
@@ -251,6 +247,7 @@ while [ $h -lt $ENDHOUR ] ; do
             INTSIG=$INTSIG2
             INTSFC=$INTSFC2
             INTFLX=$INTFLX2
+            INTNCO=$INTNCO2
         fi
     fi
 	if [ $hx -lt 10 ];then hx=0$hx;fi
@@ -262,18 +259,18 @@ while [ $h -lt $ENDHOUR ] ; do
 	export SST_GRB SNO_GRB SCV_GRB ICE_GRB iicegrb isstgrb isnogrb ism2grb
 	export SWHR_GBL LWHR_GBL
 	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+						$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	#
 	# Execute forecast
 	#
-    if [ "$BATCHQUE" = qsub ]; then
-        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+    if [ "@BATCHQUE@" = qsub ]; then
+        fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
         log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
-    elif [ "$BATCHQUE" = llsubmit ]; then
-        fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+    elif [ "@BATCHQUE@" = llsubmit ]; then
+        fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
         log_name="fcst.e`echo $fcstid | cut -d'.' -f2`"
-    elif [ "$BATCHQUE" = bsub ]; then
-        fcstid0=`$BATCHQUE < @RUNSCR_DIR@/fcst @BATCHsuffix@`
+    elif [ "@BATCHQUE@" = bsub ]; then
+        fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/fcst @BATCHsuffix@`
         fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
         log_name="fcst.e`echo $fcstid`"
     fi
@@ -282,39 +279,39 @@ while [ $h -lt $ENDHOUR ] ; do
 	#
 	if [ @BARO_TEST@ != 1 ]; then
 		if [ @DOPOST@ = yes ] ; then
-			phs=0
+			phs=$h
 			phe=$hx
 			phinc=$INTSIG
-			fhs=0
+			fhs=$h
 			fhe=$hx
 			fhinc=$INTFLX
 			if [ $h -gt 0 ]; then
 				phs=`expr $h + $INTSIG`
 				fhs=`expr $h + $INTFLX`
 			fi
-			export phs phe phinc fhs fhe fhinc
-			if [ "$BATCHQUE" != "" ]; then
-				if [ "$BATCHQUE" = llsubmit ]; then
-					@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+			export phs phe phinc fhs fhe fhinc SIG_GRIB POST_SFC DEL_BINARY
+			if [ "@BATCHQUE@" != "" ]; then
+				if [ "@BATCHQUE@" = llsubmit ]; then
+					@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 					fcstid=""
 				fi
-                if [ "$BATCHQUE" = bsub ]; then
-                    pgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
+                if [ "@BATCHQUE@" = bsub ]; then
+                    pgbid=`@BATCHQUE@ @BATCHdepend@ "done(${fcstid})" \
                            < @RUNSCR_DIR@/pgb @BATCHsuffix@`
-                    fgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
+                    fgbid=`@BATCHQUE@ @BATCHdepend@ "done(${fcstid})" \
                            < @RUNSCR_DIR@/fgb @BATCHsuffix@`
                     if [ "$SIG_GRIB" = yes ]; then
-                        sgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
+                        sgbid=`@BATCHQUE@ @BATCHdepend@ "done(${fcstid})" \
                                < @RUNSCR_DIR@/sgb @BATCHsuffix@`
                     fi
                     pgbid="`echo $pgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
                     fgbid="`echo $fgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
                     sgbid="`echo $sgbid  | cut -d'<' -f2 | cut -d'>' -f1`"
                 else
-                    pgbid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/pgb @BATCHsuffix@`
-                    fgbid=`${BATCHQUE} ${BATCHdepend}${fcstid} @RUNSCR_DIR@/fgb @BATCHsuffix@`
+                    pgbid=`@BATCHQUE@ @BATCHdepend@${fcstid} @RUNSCR_DIR@/pgb @BATCHsuffix@`
+                    fgbid=`@BATCHQUE@ @BATCHdepend@${fcstid} @RUNSCR_DIR@/fgb @BATCHsuffix@`
                     if [ "$SIG_GRIB" = yes ]; then
-                        sgbid=`${BATCHQUE} ${BATCHdepend} "done(${fcstid})" \
+                        sgbid=`@BATCHQUE@ @BATCHdepend@ "done(${fcstid})" \
                               < @RUNSCR_DIR@/sgb @BATCHsuffix@`
                     fi
                 fi
@@ -326,8 +323,8 @@ while [ $h -lt $ENDHOUR ] ; do
 			# Wait for queue job of fgb and delete flux file
 			#
 			if [ "$DEL_FLUX" = yes ]; then
-				if [ "$BATCHQUE" != "" ]; then
-					@RUNSCR_DIR@/wait_que_job $fgbid $log_name $BATCHstatus || exit 8
+				if [ "@BATCHQUE@" != "" ]; then
+					@RUNSCR_DIR@/wait_que_job $fgbid $log_name @BATCHstatus@ || exit 8
 				fi
 				# delete flux file
 				if [ -s fgb.ft$fhe ]; then
@@ -337,15 +334,15 @@ while [ $h -lt $ENDHOUR ] ; do
 			#
             # Wait for queue job of pgb
             #
-            if [ "$BATCHQUE" != "" ]; then
-                @RUNSCR_DIR@/wait_que_job $pgbid $log_name $BATCHstatus || exit 8
+            if [ "@BATCHQUE@" != "" ]; then
+                @RUNSCR_DIR@/wait_que_job $pgbid $log_name @BATCHstatus@ || exit 8
             fi
 			#
 			# find archive files
 			#
 			#cp sig.ft$hx sigit || exit 8
 			#mv sigp.ft$hx sigitdt  || exit 8
-			cp sfc.ft$hx sfci || exit 8
+			#cp sfc.ft$hx sfci || exit 8
 		elif [ @CATPGB@ = yes ] ; then
 			@ETC_DIR@/catpgb
 		fi

@@ -1,0 +1,24 @@
+===============================================================================
+ This directory consists of several grads scripts for plotting SCM results.
+ Because each script is fixed to plot the TOGA COARE data from 20 to 26 Dec 1992, 
+ you should modify these scripts to fit the appropriate period and data structure 
+ if you want to change the data set.
+
+ Each script produce the plot as follows :
+
+    cnv-heating-rate.gs    convective heating rate (Q1) and moistening rate (Q2)  
+
+    crf-mean.gs            values concerning about cloud radiative forcing 
+                           observed CRF values are provided only in case of TOGA data.
+
+    rad-cld.gs             radiative forcing and cloudiness (portrait plot)
+
+    rain.gs                time-series of rainfall
+                           total, convective, large-scale rain 
+                           time-mean values and correlations are plotted together
+
+    trh-prof.gs            vertical profile of temperature and RH
+                           difference fields are plotted, 
+                           so you need two experiments for plotting.
+
+    th-prof.gs             same as trh-prof.gs, but for theta_e and theat_es 

@@ -215,10 +215,6 @@ cp @SRCS_DIR@/define.h $EXPDIR/0LOG.define.h
 ls -l @BIN_DIR@ >$EXPDIR/0LOG.bindates
 cd $EXPDIR
 #
-# Environmental variables
-#
-. @RUNSCR_DIR@/envset 
-#
 LIST_OF_FILES='r_sigit r_sigitdt r_sig r_sfc r_flx r_pgb r_fcstout r_ext r_dia'
 export LIST_OF_FILES
 #
@@ -335,12 +331,6 @@ while [ $YYYY -le $YYYYE ] ; do
 	cp ../rsm.parm .
 	if [ $h -eq -999 ] ; then
 		h=0
-		#
-		# co2
-		#
-		if [ ! -s co2con ] ; then
-	        	@RUNSCR_DIR@/co2 || exit 8
-		fi
 		#
 		# albaer
 		#
@@ -563,20 +553,20 @@ while [ $YYYY -le $YYYYE ] ; do
         	# Execute Iteration (r_fcst)
 	        #
 		export MP_SET_NUMTHREADS
-		if [ "$BATCHQUE" = "" ]; then
+		if [ "@BATCHQUE@" = "" ]; then
 			@RUNSCR_DIR@/r_fcst $h $hx $INTPOST $INCHOUR || exit 8
-		elif [ "$BATCHQUE" = qsub ]; then
-			fcstid=`$BATCHQUE -v h=$h,hx=$hx,inchour=$INTPOST,prthour=$INCHOUR \
+		elif [ "@BATCHQUE@" = qsub ]; then
+			fcstid=`@BATCHQUE@ -v h=$h,hx=$hx,inchour=$INTPOST,prthour=$INCHOUR \
 				@RUNSCR_DIR@/r_fcst @BATCHsuffix@`
 			log_name=r_fcst.e`echo $fcstid | cut -d'.' -f1`
-		elif [ "$BATCHQUE" = llsubmit ]; then
+		elif [ "@BATCHQUE@" = llsubmit ]; then
 			inchour=$INTPOST
 			prthour=$INCHOUR
 			export h hx inchour prthour
-			fcstid=`$BATCHQUE @RUNSCR_DIR@/r_fcst_lls | cut -d'"' -f2 | awk -F'.' '{print $NF}'`
+			fcstid=`@BATCHQUE@ @RUNSCR_DIR@/r_fcst_lls | cut -d'"' -f2 | awk -F'.' '{print $NF}'`
 			log_name=${fcstid}.out
-		elif [ "$BATCHQUE" = bsub ]; then
-			fcstid0=`$BATCHQUE < @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
+		elif [ "@BATCHQUE@" = bsub ]; then
+			fcstid0=`@BATCHQUE@ < @RUNSCR_DIR@/r_fcst @BATCHsuffix@`
 			fcstid="`echo $fcstid0  | cut -d'<' -f2 | cut -d'>' -f1`"
 			log_name="r_fcst.e`echo $fcstid`"
 		fi
@@ -588,24 +578,24 @@ while [ $YYYY -le $YYYYE ] ; do
 	        #
         	# Post processing
 	        #
-		if [ "$BATCHQUE" = qsub ]; then
-			@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
-			${BATCHQUE} ${BATCHdepend}${fcstid} \
+		if [ "@BATCHQUE@" = qsub ]; then
+			@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
+			@BATCHQUE@ @BATCHdepend@${fcstid} \
         	        	 -v YYYY=$YYYY,MM=$MM,DD=$DD,HH=$HH,h=$h,hx=$hx,YYYYS=$YYYYS,MMS=$MMS,FHLEN=$FHLEN,ENDHOUR=$ENDHOUR,INTPOST=$INTPOST,INCHOUR=$INCHOUR,NESTING_HOUR=$NESTING_HOUR,DELETE_BASE=$DELETE_BASE,EXECDIR=$EXECDIR \
                 		@RUNSCR_DIR@/r_post_all
 			@RUNSCR_DIR@/wait_sigit_update $hx  || exit 8
-		elif [ "$BATCHQUE" = llsubmit ]; then
-			@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+		elif [ "@BATCHQUE@" = llsubmit ]; then
+			@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 			export YYYY MM DD HH h hx YYYYS MMS FHLEN ENDHOUR INTPOST INCHOUR NESTING_HOUR DELETE_BASE
-			$BATCHQUE @RUNSCR_DIR@/r_post_all_lls
+			@BATCHQUE@ @RUNSCR_DIR@/r_post_all_lls
 			@RUNSCR_DIR@/wait_sigit_update $hx  || exit 8
-		elif [ "$BATCHQUE" = bsub ]; then
-			@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+		elif [ "@BATCHQUE@" = bsub ]; then
+			@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 			export YYYY MM DD HH h hx YYYYS MMS FHLEN ENDHOUR INTPOST INCHOUR NESTING_HOUR DELETE_BASE
-			$BATCHQUE < @RUNSCR_DIR@/r_post_all_lls
+			@BATCHQUE@ < @RUNSCR_DIR@/r_post_all_lls
 			@RUNSCR_DIR@/wait_sigit_update $hx  || exit 8
 		else
-			@RUNSCR_DIR@/wait_que_job $fcstid $log_name $BATCHstatus || exit 8
+			@RUNSCR_DIR@/wait_que_job $fcstid $log_name @BATCHstatus@ || exit 8
 			@RUNSCR_DIR@/r_post_all $YYYY $MM $DD $HH $h $hx \
                         			$YYYYS $MMS $FHLEN $ENDHOUR $INTPOST $INCHOUR $NESTING_HOUR $DELETE_BASE || exit 8
 			@RUNSCR_DIR@/wait_sigit_update $hx  || exit 8

@@ -1,0 +1,181 @@
+*-----------------------------------------------
+* set parameters .....
+*
+*
+*                                 experiments
+  expn=1
+  exp.1=test
+  nexp.1=exp.1
+*                                 make directory for saving plots
+  gdir='_gt'
+ '!mkdir -p 'gdir''
+*----------------------------------------------------------------------
+* open ctl files
+  n = 1
+  while (n <= expn)
+   fname = '@EXEC_DIR@/cld.ctl'
+  'open 'fname
+   say fname
+   n = n + 1
+  endwhile
+  nfa = n
+  n = 1
+  while (n <= expn)
+   fname = '@EXEC_DIR@/fa.ctl'
+  'open 'fname
+   say fname
+   n = n + 1
+  endwhile
+  nobs = n + nfa-1 
+ 'open @RUN_DIR@/con_scm/TOGA/isccp/rtoga.ctl'
+*
+  tim1='20dec1992'
+  tim2='26dec1992'
+*----------------------------------------------------------------------
+*
+ 'set display color white'
+ 'run bw_wv.gs' 
+ 'clear'
+*
+ 'set x 1'
+ 'set y 1'
+*
+ 'set z 1'
+  n = 1
+  while (n <= expn)
+   nc = n
+   nf = n + nfa-1
+   say nc' 'nf
+  'define crfsw'n' = ave(cfnsftoa.'nc',time='tim1',time='tim2')'
+  'define crflw'n' = ave(cfnlftoa.'nc',time='tim1',time='tim2')'
+  'define olr'n'  = ave(ulwrftoa.'nf',time='tim1',time='tim2')'
+  'define cf'n' = ave(tcdcclm.'nf',time='tim1',time='tim2')'
+  'define uswsfc'n' = ave(uswrfsfc.'nf',time='tim1',time='tim2')'
+  'define ulwsfc'n' = ave(ulwrfsfc.'nf',time='tim1',time='tim2')'
+  'define dswsfc'n' = ave(dswrfsfc.'nf',time='tim1',time='tim2')'
+  'define dlwsfc'n' = ave(dlwrf.'nf',time='tim1',time='tim2')'
+  'define dswtoa'n' = ave(dswrftoa.'nf',time='tim1',time='tim2')'
+  'define uswtoa'n' = ave(uswrftoa.'nf',time='tim1',time='tim2')'
+   n = n + 1
+  endwhile
+*
+  'define swf0 = ave(swdntoa.'nobs'-swuptoa.'nobs',time='tim1',time='tim2')'
+  'define olr0 = ave(lwuptoa.'nobs',time='tim1',time='tim2')'
+  'define swfc0 = ave(swdntoa.'nobs'-swuptoacl.'nobs',time='tim1',time='tim2')'
+  'define olrc0 = ave(lwuptoacl.'nobs',time='tim1',time='tim2')'
+  'define crfsw0 = swf0-swfc0'
+  'define crflw0 = olrc0-olr0'
+  'define cf0 = ave(cldf.'nobs'*100,time='tim1',time='tim2')'
+  'define uswsfc0 = ave(swupsfc.'nobs',time='tim1',time='tim2')'
+  'define ulwsfc0 = ave(lwupsfc.'nobs',time='tim1',time='tim2')'
+  'define dswsfc0 = ave(swdnsfc.'nobs',time='tim1',time='tim2')'
+  'define dlwsfc0 = ave(lwdnsfc.'nobs',time='tim1',time='tim2')'
+  'define dswtoa0 = ave(swdntoa.'nobs',time='tim1',time='tim2')'
+  'define uswtoa0 = ave(swuptoa.'nobs',time='tim1',time='tim2')'
+*
+*----------------------------------------------------------------------
+ 'set vpage 0.0 11.0 0.0 8.5'
+ 'set string 6 r 3'
+ 'set strsiz 0.10'
+ 'draw string 8.3 10.9 TOGA_1218_case NML/Yonsei Univ'
+ 'set string 1 l 3'
+ 'set strsiz 0.12'
+ 'draw string 0.3 10.9 CRF (CRF = CRF_sw + CRF_lw)'
+ 'enable print 'gdir'/crf-mean.plt'
+*
+  x1 = 0.3
+  y1 = 5.0
+  x2 = x1 + 10.5
+  y2 = y1 + 3.0
+*
+ 'set parea 'x1' 'x2' 'y1' 'y2
+ 'draw line 'x1+0.1' 'y2-0.2' 'x2-0.1' 'y2-0.2
+ 'set string 1 l 3'
+ 'set strsiz 0.09'
+ 'draw string 'x1+1.0' 'y2' CRF_SW'
+ 'draw string 'x1+1.8' 'y2' CRF_LW'
+ 'draw string 'x1+2.6' 'y2' CRF'
+ 'draw string 'x1+3.4' 'y2' Cf'  
+ 'draw string 'x1+4.2' 'y2' OLR'
+ 'draw string 'x1+5.0' 'y2' LWUP_sfc'
+ 'draw string 'x1+5.8' 'y2' LWDN_sfc'
+ 'draw string 'x1+6.6' 'y2' SWUP_toa'
+ 'draw string 'x1+7.4' 'y2' SWDN_toa'
+ 'draw string 'x1+8.2' 'y2' SWUP_sfc'
+ 'draw string 'x1+9.0' 'y2' SWDN_sfc'
+*
+ 'set x 1'
+ 'set y 1'
+ 'set z 1'
+ 'set time 'tim1
+  n = 0
+  while (n <= expn)
+    if (n=0); cap='TOGA'; endif;
+    if (n=1); cap=nexp.1; endif;
+    if (n=2); cap=nexp.2; endif;
+    if (n=3); cap=nexp.3; endif;
+    if (n=4); cap=nexp.4; endif;
+    if (n=5); cap=nexp.5; endif;
+    if (n=6); cap=nexp.6; endif;
+    if (n=7); cap=nexp.7; endif;
+    if (n=8); cap=nexp.8; endif;
+    if (n=9); cap=nexp.9; endif;
+    if (n=10); cap=nexp.10; endif;
+    c1='crfsw'n
+    c2='crflw'n
+    c3='crfsw'n'+crflw'n''
+    c4='cf'n
+    c5='olr'n
+    c6='ulwsfc'n
+    c7='dlwsfc'n
+    c8='uswtoa'n
+    c9='dswtoa'n
+    c10='uswsfc'n
+    c11='dswsfc'n
+   'draw string 'x1' 'y2-0.3-n*0.2' 'cap
+    wc = gwrite(c1)
+    wc1 = wc
+   'draw string 'x1+1.0' 'y2-0.3-n*0.2' 'wc1
+    wc = gwrite(c2)
+    wc2 = wc
+   'draw string 'x1+1.8' 'y2-0.3-n*0.2' 'wc2
+    wc = gwrite(c3)
+    wc3 = wc
+   'draw string 'x1+2.6' 'y2-0.3-n*0.2' 'wc3
+    wc = gwrite(c4)
+    wc4 = wc
+   'draw string 'x1+3.4' 'y2-0.3-n*0.2' 'wc4
+    wc = gwrite(c5)
+    wc5 = wc
+   'draw string 'x1+4.2' 'y2-0.3-n*0.2' 'wc5
+    wc = gwrite(c6)
+    wc6 = wc
+   'draw string 'x1+5.0' 'y2-0.3-n*0.2' 'wc6
+    wc = gwrite(c7)
+    wc7 = wc
+   'draw string 'x1+5.8' 'y2-0.3-n*0.2' 'wc7
+    wc = gwrite(c8)
+    wc8 = wc
+   'draw string 'x1+6.6' 'y2-0.3-n*0.2' 'wc8
+    wc = gwrite(c9)
+    wc9 = wc
+   'draw string 'x1+7.4' 'y2-0.3-n*0.2' 'wc9
+    wc = gwrite(c10)
+    wc10 = wc
+   'draw string 'x1+8.2' 'y2-0.3-n*0.2' 'wc10
+    wc = gwrite(c11)
+    wc11 = wc
+   'draw string 'x1+9.0' 'y2-0.3-n*0.2' 'wc11
+    n = n + 1
+  endwhile
+*
+ 'print'
+ 'disable print'
+*
+*----------------------------------------------------------------------
+  function gwrite(fp)
+*
+ 'define fmd = 'fp
+ 'd fmd'
+  wc = subwrd(result,4)
+  return(wc)

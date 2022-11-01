@@ -52,7 +52,6 @@ else
         rm -f @FTNID@[0-9]* 2>/dev/null
 fi
 #
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@               @FTNID@1
 @FTASS@ $EXECDIR/co2con                            @FTNID@15
 @FTASS@ $EXECDIR/r_mtnvar                          @FTNID@24
 @FTASS@ @CON_DIR@/o3prod.clim.asc                  @FTNID@28

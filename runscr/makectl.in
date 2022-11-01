@@ -16,40 +16,97 @@ obj=$1
 # 3-digit
 #
 obj3=`echo $obj | cut -c1-3`
-ftnum=`ls ${obj}.ft* | wc -l`
-dtnum=`ls ${obj}.1* ${obj}.2* | wc -l`
+ftnum=`ls ${obj}.ft* 2> /dev/null | wc -l`
+dtnum=`ls ${obj}.1* ${obj}.2* 2> /dev/null | wc -l`
 if [ $ftnum -ne 0 ]; then
 	f0=
-	@ETC_DIR@/grmap ${obj}.ft%f2
+	@ETC_DIR@/grmap ${obj}.ft%f2 >& /dev/null
 	sed -e "/dset/cdset ^.\/${obj}.ft%f2" \
 		-e "/index/cindex ^.\/${obj}.idx" \
-		-i ${obj3}.ctl
+		${obj3}.ctl > tmpf
+	mv tmpf ${obj3}.ctl
 elif [ $dtnum -ne 0 ]; then
 	f0='-0'
-	@ETC_DIR@/grmap ${obj}.%y4%m2%d2%h2
+	@ETC_DIR@/grmap ${obj}.%y4%m2%d2%h2 >& /dev/null
 	sed -e "/dset/cdset ^.\/${obj}.%y4%m2%d2%h2" \
 		-e "/index/cindex ^.\/${obj}.idx" \
-		-i ${obj3}.ctl
+		${obj3}.ctl > tmpf
+	mv tmpf ${obj3}.ctl
 fi
 #
 # fgb corr.
 #
 if [ "$obj" == "fgb" ]; then
 	sed -e 's/TMPhag     0 11,105,0/TMPhag     0 11,105,2/g'  \
+		-e 's/MIXR       0 53,105,0/MIXR       0 53,105,2/g'  \
 		-e 's/SPFH       0 51,105,0/SPFH       0 51,105,2/g'  \
 		-e 's/UGRD       0 33,105,0/UGRD       0 33,105,10/g' \
 		-e 's/VGRD       0 34,105,0/VGRD       0 34,105,10/g' \
 		-e 's/TMAX       0 15,105,0/TMAX       0 15,105,2/g'  \
 		-e 's/TMIN       0 16,105,0/TMIN       0 16,105,2/g'  \
-		-i ${obj3}.ctl
+		-e 's/200     100      40      10/10 2600 10340 25800/g' \
+		${obj3}.ctl > tmpf
+	mv tmpf ${obj3}.ctl
+fi
+if [ "$obj" == "dcp" ]; then
+	sed -e "/dset/cdset ^.\/dcp.ft%f2" \
+		-e "/undef/cundef -9999.0" \
+		-e "/options/coptions template big_endian sequential" \
+		-e "/xdef/cxdef 1 linear 0 1" \
+		-e "/ydef/cydef 1 linear 0 1" \
+		-e "/title/d" \
+		-e "/dtype/d" \
+		-e "/index/d" \
+		-e "/vars/,\$d" \
+		pgb.ctl > tmp1.ctl
+cat > tmp2.ctl << EOF
+vars 30
+cls   40 99 stratiform cloud area fraction
+clc   40 99 convective cloud area fraction
+cl    40 99 cloud area fractoin
+clws  40 99 mass fraction of stratiform cloud liquid water
+clwc  40 99 mass fraction of convective cloud liquid water
+clis  40 99 mass fraction of stratiform cloud ice
+clic  40 99 mass fraction of convective cloud ice
+clw   40 99 mass fraction of cloud liquid water
+cli   40 99 mass fraction of cloud ice
+sclwc 40 99 mass fraction of shallow convective cloud liquid water
+dclwc 40 99 mass fraction of deep convective cloud liquid water
+sclic 40 99 mass fraction of shallow convective cloud ice
+dclic 40 99 mass fraction of deep convective cloud ice
+rho   40 99 density
+mcu   40 99 convective updraft mass flux
+mcd   40 99 convective downdraft mass flux
+tntrsw 40 99 shortwave radiative heating rate
+tntrlw 40 99 longwave radiative heating rate
+tntdp  40 99 rate of change of temperature due to deep convection
+tntsh  40 99 rate of change of temperature due to shallow convection
+tntpbl 40 99 rate of change of temperature due to boundary layer
+tntlscp 40 99 rate of change of temperature due to grid-scale precipitation, cloud
+tnhusdp 40 99 rate of change of specific humidity due to deep convection
+tnhussh 40 99 rate of change of specific humidity due to shallow convection
+tnhuspbl 40 99 rate of change of specific humidity due to boundary layer
+tnhuslscp 40 99 rate of change of specific humidity due to grid-scale precipitation, cloud
+tnt 40 99 total rate of change of temperature
+tnhus 40 99 total rate of change of specific humidity
+tnta 40 99 rate of change of temperature due to advection
+tnhusa 40 99 rate of change of specific humidity due to advection
+endvars
+EOF
+	cat tmp1.ctl tmp2.ctl > ${obj}.ctl
+	rm -f tmp1.ctl tmp2.ctl
 fi
 #
 # smp corr.
 #
-sed -e 's/-6hr/6hr/g' -e 's/-11hr/1hr/g' -e 's/-9hr/3hr/g' -i ${obj3}.ctl
+sed -e 's/-6hr/6hr/g' \
+	-e 's/-11hr/1hr/g' \
+	-e 's/-9hr/3hr/g' \
+	${obj3}.ctl > tmpf
+mv tmpf ${obj3}.ctl
 #
 # gribmap
 #
-gribmap $f0 -i ${obj3}.ctl
+gribmap $f0 -i ${obj3}.ctl >& /dev/null
 #
 exit 0

@@ -29,12 +29,14 @@ INTOMLX=24              # Time interval to run ocean mixed layer model
 INTSIG=3                # Time interval to create sigma output file
 INTSFC=$INTSIG          # Time interval to create surface output file
 INTFLX=$INTSFC          # Time interval to create surface flux output file
+INTNCO=$INTSIG          # Time interavl to create nc output file
 INTSIG2=6               # Time interval to create sigma output file after first execution
 INTSFC2=$INTSIG2        # Time interval to create surface output file after first execution
 INTFLX2=$INTSFC2        # Time interval to create surface flux output file after first execution
+INTNCO2=$INTSIG2        # Time interavl to create nc output file
 INTRESTART=$ENDHOUR     # Time interval to restart the model
 SWHR_GBL=1              # Time interval of shortwave radiation flux (default=6)
-LWHR_GBL=3              # Time interval of longwave  radiation flux
+LWHR_GBL=1              # Time interval of longwave  radiation flux
 #
 DEL_FLUX=no             # Option deleting flux file after forecst (yes;no)
 FCST_RESTART=yes        # Option indicating whether current forecast is first
@@ -99,10 +101,6 @@ INPUT_RESOLUTION=t@IJCAP@k@ILEVS@
 FCST_NPES=@NPES@
 FCST_NCPUS=@NCPUS@
 #
-# set environmental variables
-#
-. @RUNSCR_DIR@/envset
-#
 # cd to run directory
 #
 #scrnam=`echo $0 | sed 's?.*/??g'`
@@ -129,13 +127,6 @@ if [ @BARO_TEST@ != 1 ]; then
 		h=`@ETC_DIR@/fhour sigit`
 		echo fhour in the sigit file = $h
 	else
-		#
-		# co2
-		#
-		echo 'CO2 process...'
-		if [ ! -s co2con ] ; then
-			@RUNSCR_DIR@/co2 || exit 8
-		fi
 		#
 		# mountain
 		#
@@ -265,6 +256,7 @@ while [ $h -lt $ENDHOUR ] ; do
 			INTSIG=$INTSIG2
 			INTSFC=$INTSFC2
 			INTFLX=$INTFLX2
+			INTNCO=$INTNCO2
 		fi
 	fi
 	if [ $hx -lt 10 ];then hx=0$hx;fi
@@ -277,14 +269,14 @@ while [ $h -lt $ENDHOUR ] ; do
 	export SWHR_GBL LWHR_GBL
 	echo 'Make fcst.parm file...'
 	@RUNSCR_DIR@/fcstparm $INCHOUR $ENDHOUR $INTSFCX:$INTOMLX \
-						$INTSIG:$INTSFC:$INTFLX:$INTRESTART || exit 8
+						$INTSIG:$INTSFC:$INTFLX:$INTNCO:$INTRESTART || exit 8
 	#
 	# Execute forecast
 	#
 	echo '----------------'
 	echo 'Execute forecast'
 	echo '----------------'
-	fcstid=`$BATCHQUE @RUNSCR_DIR@/fcst @BATCHsuffix@`
+	fcstid=`@BATCHQUE@ @RUNSCR_DIR@/fcst @BATCHsuffix@`
 #	log_name="fcst.e`echo $fcstid | cut -d'.' -f1`"
 	log_name="GRIMs_fcst.out"
 	#
@@ -301,7 +293,7 @@ while [ $h -lt $ENDHOUR ] ; do
 			else
 				pshour=`expr $h + $INTSIG`
 			fi
-			@RUNSCR_DIR@/post_gmp $pshour $hx $INTSIG $fcstid $log_name $BATCHQUE $BATCHstatus
+			@RUNSCR_DIR@/post_kaf $pshour $hx $INTSIG $fcstid $log_name @BATCHQUE@ @BATCHstatus@
             #
             # delete flux file
             #
@@ -314,7 +306,7 @@ while [ $h -lt $ENDHOUR ] ; do
 			#
 			#cp sig.ft$hx sigit || exit 8
 			#mv sigp.ft$hx sigitdt  || exit 8
-			cp sfc.ft$hx sfci || exit 8
+			#cp sfc.ft$hx sfci || exit 8
 		elif [ @CATPGB@ = yes ] ; then
 			@ETC_DIR@/catpgb
 		fi

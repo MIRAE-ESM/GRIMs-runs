@@ -5,19 +5,19 @@ set -x
 #
 #  $1 is starting date
 #  $2 is ending date
-#  $3 is output sigma file name
-#  $4 is output sfc file name
+#  $3 is initial date
+#  $4 is the number of time
+#  $5 is dtv
 #
-STIME=$1
-ETIME=$2
-OUT_SIG_FILE=$3
-OUT_SFC_FILE=$4
+STIME=${STIME:=$1}
+ETIME=${ETIME:=$2}
 #
 PROG=presmp
 cat >$PROG.parm <<EOF
- &NAMTIME
-  STIME=$STIME, ETIME=$ETIME,
- &END
+&namtime
+stime=$STIME,
+etime=$ETIME,
+/
 EOF
 #
 #
@@ -34,8 +34,10 @@ fi
 if [ @SYSTEM@ = cray -o @SYSTEM@ = t90 -o @SYSTEM@ = t3e ] ; then
         assign -R
 fi
-@FTASS@ orogrd.smth                         @FTNID@24
-@FTASS@ @RUNS_DIR@/namelist.@SCRIPT@        @FTNID@1
+@FTASS@ orogrd.smth                @FTNID@24
+@FTASS@ @CON_DIR@/aerosol.macc.asc @FTNID@47
+@FTASS@ @CON_DIR@/ozone_gmao.asc   @FTNID@48
+@FTASS@ @CON_DIR@/co2_gosat.asc    @FTNID@49
 rm -f $PROG.x
 ln -s @BIN_DIR@/${PROG}.x $PROG.x
 ./$PROG.x < $PROG.parm 1>$PROG.out 2>&1
@@ -44,6 +46,4 @@ if [ $? -ne 0 ] ; then
 	exit 8
 fi
 rm -f @FTNID@[0-9]*
-mv scmini.ft00 $OUT_SIG_FILE
-mv sfcini.ft00 $OUT_SFC_FILE
 exit 0
